@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../core/no_transition_route.dart';
+import '../widgets/app_top_bar.dart';
+import 'monitoring_screen.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -15,39 +19,9 @@ class _HomeScreenState extends State<HomeScreen> {
     const primaryColor = Color(0xFF388E3C); // Agriculture Green
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-
-      // --- Top Header with Actual PNG Logo ---
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF9FAFB),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        titleSpacing: 20,
-        title: Row(
-          children: [
-            // Render actual PNG logo asset
-            Image.asset(
-              'assets/images/logo.png',
-              height:
-                  36, // Adjust height as needed for your logo's aspect ratio
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                // Fallback icon if asset path isn't found in pubspec.yaml
-                return const Icon(Icons.eco, color: primaryColor, size: 32);
-              },
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'MaisNutri',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2E7D32),
-              ),
-            ),
-          ],
-        ),
-      ),
+      backgroundColor: Colors.white,
+      extendBodyBehindAppBar: true,
+      appBar: const AppTopBar(),
 
       // --- Main Body ---
       body: SingleChildScrollView(
@@ -55,6 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            SizedBox(
+              height:
+                  MediaQuery.of(context).padding.top + AppTopBar.height + 16,
+            ),
             // --- Welcome Header ---
             const Text(
               'Welcome, FarmerJD',
@@ -168,61 +146,87 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () {},
             ),
 
-            const SizedBox(height: 80), // Space to avoid bottom bar overlap
+            const SizedBox(height: 110), // Space to avoid bottom bar overlap
           ],
         ),
       ),
 
-      // --- Floating Center Action Button (Scan) ---
+      // --- Enlarged Center Action Button (Scan) ---
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Container(
-        height: 64,
-        width: 64,
-        margin: const EdgeInsets.only(top: 24),
+        height: 80,
+        width: 80,
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.all(6), // Light outer border ring
+        decoration: BoxDecoration(
+          color: primaryColor.withValues(alpha: 0.25),
+          shape: BoxShape.circle,
+        ),
         child: FloatingActionButton(
           onPressed: () => setState(() => _selectedTab = 1),
           backgroundColor: primaryColor,
-          elevation: 4,
+          elevation: 2,
           shape: const CircleBorder(),
           child: const Icon(
-            Icons.qr_code_scanner_rounded,
-            size: 30,
+            Icons.camera_alt_rounded,
+            size: 34, // Increased FAB icon size
             color: Colors.white,
           ),
         ),
       ),
 
-      // --- Modern Bottom Navigation Bar ---
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
-        clipBehavior: Clip.antiAlias,
-        color: Colors.white,
-        elevation: 10,
-        child: SizedBox(
-          height: 60,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // Left Tab: Home
-              _buildNavItem(
-                icon: Icons.home_rounded,
-                label: 'Home',
-                index: 0,
-                primaryColor: primaryColor,
-              ),
+      // --- Bottom Navigation Bar with Larger Icons & Text ---
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              spreadRadius: 2,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: BottomAppBar(
+            shape: const CircularNotchedRectangle(),
+            notchMargin: 10.0,
+            clipBehavior: Clip.antiAlias,
+            color: Colors.white,
+            elevation: 0,
+            child: SizedBox(
+              height: 76, // A bit of headroom so the 32px icon + 14px label don't overflow
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  // Left Tab: Home
+                  _buildNavItem(
+                    icon: Icons.home_rounded,
+                    label: 'Home',
+                    index: 0,
+                    primaryColor: primaryColor,
+                  ),
 
-              // Spacer for the center Scan FloatingActionButton
-              const SizedBox(width: 48),
+                  // Spacer for the center Scan FloatingActionButton
+                  const SizedBox(width: 64),
 
-              // Right Tab: Monitoring
-              _buildNavItem(
-                icon: Icons.insights_rounded,
-                label: 'Monitoring',
-                index: 2,
-                primaryColor: primaryColor,
+                  // Right Tab: Monitoring
+                  _buildNavItem(
+                    icon: Icons.insights_rounded,
+                    label: 'Monitoring',
+                    index: 2,
+                    primaryColor: primaryColor,
+                    onTap: () => Navigator.pushReplacement(
+                      context,
+                      noTransitionRoute(const MonitoringScreen()),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -298,35 +302,47 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Bottom Navigation Bar Item Builder
+  // Navigation Item with Larger Icon (32px) and Larger Label (14px)
   Widget _buildNavItem({
     required IconData icon,
     required String label,
     required int index,
     required Color primaryColor,
+    VoidCallback? onTap,
   }) {
     final isSelected = _selectedTab == index;
+    final activeColor = primaryColor;
+    final inactiveColor = Colors.grey.shade400;
+
     return InkWell(
-      onTap: () => setState(() => _selectedTab = index),
+      onTap: onTap ?? () => setState(() => _selectedTab = index),
       borderRadius: BorderRadius.circular(12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? primaryColor : Colors.black38,
-            size: 26,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        // Scales the icon+label down instead of overflowing if the available
+        // height ever ends up a few pixels short (varies with font metrics).
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? activeColor : inactiveColor,
+                size: 32, // Increased from 26
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14, // Increased from 12
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  color: isSelected ? activeColor : inactiveColor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected ? primaryColor : Colors.black45,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
