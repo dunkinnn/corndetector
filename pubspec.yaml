@@ -38,6 +38,9 @@ dependencies:
   # Local key-value storage, used for the "Save Password" login preference.
   shared_preferences: ^2.3.2
 
+  # Camera/gallery photo selection for the leaf scan flow.
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

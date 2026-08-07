@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>MaisNutri needs camera access to photograph corn leaves for nutrient deficiency scans.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MaisNutri needs photo library access to select corn leaf photos for nutrient deficiency scans.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
