@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../core/no_transition_route.dart';
-import '../models/field_conditions.dart';
-import '../services/field_conditions_service.dart';
+import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
-import 'monitoring_screen.dart';
+import 'deficiency_alerts_screen.dart';
+import 'fertilizer_recommendations_screen.dart';
+import 'nutrient_guide_screen.dart';
+import 'scan_history_screen.dart';
 import 'scan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,41 +20,23 @@ class HomeScreen extends StatefulWidget {
 const String _placeholder = '--';
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedTab = 0; // 0: Home, 1: Scan (Center), 2: Monitoring
+  // Most recent scan result. Keep the result string short, e.g. "Healthy",
+  // "N Low", so it fits the card without truncating.
+  // TODO: read from the stored scan history once results are persisted.
+  String get _latestResult => _placeholder;
+  String get _latestConfidence => _placeholder;
+  String get _latestScanDate => _placeholder;
 
-  final FieldConditionsService _conditionsService = FieldConditionsService();
+  // Scan counts, populated once scan results are persisted.
+  final int _healthyCount = 0;
+  final int _deficientCount = 0;
 
-  FieldConditions? _conditions;
-  bool _loadingConditions = true;
-  bool _conditionsFailed = false;
+  int get _totalScans => _healthyCount + _deficientCount;
+  bool get _hasScans => _totalScans > 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadConditions();
-  }
-
-  // Pulls current conditions; leaves the card on placeholders if it fails.
-  Future<void> _loadConditions() async {
-    setState(() {
-      _loadingConditions = true;
-      _conditionsFailed = false;
-    });
-
-    try {
-      final conditions = await _conditionsService.fetch();
-      if (!mounted) return;
-      setState(() {
-        _conditions = conditions;
-        _loadingConditions = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _loadingConditions = false;
-        _conditionsFailed = true;
-      });
-    }
+  // Opens a quick action sub-screen on top of Home.
+  void _open(Widget page) {
+    Navigator.push(context, noTransitionRoute(page));
   }
 
   @override
@@ -122,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
 
-            // --- Weather & Field Condition Card ---
+            // --- Latest Detection Card ---
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
@@ -158,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Field Live Conditions',
+                              'Latest Detection',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13,
@@ -166,24 +150,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            GestureDetector(
-                              onTap: _conditionsFailed ? _loadConditions : null,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  _conditionsBadgeLabel,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Most Recent',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
@@ -193,22 +174,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _buildWeatherMetric(
-                              Icons.wb_sunny_rounded,
-                              _conditions?.temperatureLabel ?? _placeholder,
-                              'Weather',
-                            ),
-                            _buildDivider(),
-                            _buildWeatherMetric(
-                              Icons.water_drop_rounded,
-                              _conditions?.humidityLabel ?? _placeholder,
-                              'Humidity',
-                            ),
-                            _buildDivider(),
-                            _buildWeatherMetric(
+                            _buildDetectionMetric(
                               Icons.grass_rounded,
-                              _conditions?.soilMoistureLabel ?? _placeholder,
-                              'Soil Moisture',
+                              _latestResult,
+                              'Result',
+                            ),
+                            _buildDivider(),
+                            _buildDetectionMetric(
+                              Icons.percent_rounded,
+                              _latestConfidence,
+                              'Confidence',
+                            ),
+                            _buildDivider(),
+                            _buildDetectionMetric(
+                              Icons.schedule_rounded,
+                              _latestScanDate,
+                              'Last Scan',
                             ),
                           ],
                         ),
@@ -218,14 +199,38 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            // --- Empty State ---
+            // Explains the placeholders before any scan has been recorded.
+            if (!_hasScans) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: Colors.grey.shade500,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No scans yet. Tap the camera button to scan a corn leaf.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 28),
 
-            // --- Crop Health Overview Header ---
+            // --- Scan Summary Header ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Crop Health Overview',
+                  'Scan Summary',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -233,45 +238,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     letterSpacing: -0.3,
                   ),
                 ),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Details',
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
+                Text(
+                  _hasScans ? '$_totalScans total' : '',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 14),
 
-            // --- Crop Health Cards ---
+            // --- Scan Summary Cards ---
+            // Plain counts of past scans, so no aggregation rule is implied.
             Row(
               children: [
                 Expanded(
                   child: _buildHealthCard(
-                    title: 'Healthy Crop',
-                    value: _placeholder,
+                    title: 'Healthy Scans',
+                    value: _hasScans ? '$_healthyCount' : _placeholder,
                     color: primaryColor,
-                    progress: 0,
+                    progress: _hasScans ? _healthyCount / _totalScans : 0,
                     icon: Icons.check_circle_rounded,
                   ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: _buildHealthCard(
-                    title: 'Needs Attention',
-                    value: _placeholder,
+                    title: 'Deficient Scans',
+                    value: _hasScans ? '$_deficientCount' : _placeholder,
                     color: const Color(0xFFE65100),
-                    progress: 0,
+                    progress: _hasScans ? _deficientCount / _totalScans : 0,
                     icon: Icons.warning_amber_rounded,
                   ),
                 ),
@@ -293,22 +291,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // --- Action Cards ---
             _buildActionCard(
-              icon: Icons.bug_report_rounded,
-              title: 'Pest & Deficiency Alerts',
-              subtitle: 'Check potential risks for current season',
-              onTap: () {},
+              icon: Icons.warning_amber_rounded,
+              title: 'Deficiency Alerts',
+              subtitle: 'Review detected N, P, K deficiencies',
+              onTap: () => _open(const DeficiencyAlertsScreen()),
             ),
             _buildActionCard(
               icon: Icons.menu_book_rounded,
-              title: 'Nutrient & Fertilizer Guide',
-              subtitle: 'Learn recommended N, P, K dosage',
-              onTap: () {},
+              title: 'Nutrient Guide',
+              subtitle: 'Symptoms and causes of each deficiency',
+              onTap: () => _open(const NutrientGuideScreen()),
             ),
             _buildActionCard(
-              icon: Icons.edit_note_rounded,
-              title: 'Field Notes & Logs',
-              subtitle: 'Record field observations and sprays',
-              onTap: () {},
+              icon: Icons.science_rounded,
+              title: 'Fertilizer Recommendations',
+              subtitle: 'Suggested dosage and application timing',
+              onTap: () => _open(const FertilizerRecommendationsScreen()),
+            ),
+            _buildActionCard(
+              icon: Icons.history_rounded,
+              title: 'Scan History',
+              subtitle: 'Past leaf scans and deficiency results',
+              onTap: () => _open(const ScanHistoryScreen()),
             ),
 
             const SizedBox(height: 110), // Space to avoid bottom bar overlap
@@ -316,105 +320,19 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
 
-      // --- Enlarged Center Action Button (Scan) ---
+      // --- Centre Scan Button ---
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Container(
-        height: 76,
-        width: 76,
-        margin: const EdgeInsets.only(top: 10),
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: primaryColor.withValues(alpha: 0.15),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withValues(alpha: 0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          onPressed: () =>
-              Navigator.push(context, noTransitionRoute(const ScanScreen())),
-          backgroundColor: primaryColor,
-          elevation: 2,
-          shape: const CircleBorder(),
-          child: const Icon(
-            Icons.camera_alt_rounded,
-            size: 32,
-            color: Colors.white,
-          ),
-        ),
+      floatingActionButton: AppScanButton(
+        onPressed: () =>
+            Navigator.push(context, noTransitionRoute(const ScanScreen())),
       ),
 
-      // --- Bottom Navigation Bar ---
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 20,
-              spreadRadius: 0,
-              offset: const Offset(0, -6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          child: BottomAppBar(
-            shape: const CircularNotchedRectangle(),
-            notchMargin: 10.0,
-            clipBehavior: Clip.antiAlias,
-            color: Colors.white,
-            elevation: 0,
-            child: SizedBox(
-              height: 76,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Left Tab: Home
-                  _buildNavItem(
-                    icon: Icons.home_rounded,
-                    label: 'Home',
-                    index: 0,
-                    primaryColor: primaryColor,
-                  ),
-
-                  // Spacer for the center Scan FloatingActionButton
-                  const SizedBox(width: 64),
-
-                  // Right Tab: Monitoring
-                  _buildNavItem(
-                    icon: Icons.insights_rounded,
-                    label: 'Monitoring',
-                    index: 2,
-                    primaryColor: primaryColor,
-                    onTap: () => Navigator.pushReplacement(
-                      context,
-                      noTransitionRoute(const MonitoringScreen()),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+      bottomNavigationBar: const AppBottomNav(current: AppTab.home),
     );
   }
 
-  // Badge doubles as the status line for the conditions fetch.
-  String get _conditionsBadgeLabel {
-    if (_loadingConditions) return 'Updating';
-    if (_conditionsFailed) return 'Tap to retry';
-    return 'Live Update';
-  }
-
-  // Modern Weather Metric Component
-  Widget _buildWeatherMetric(IconData icon, String value, String label) {
+  // Detection Metric Component for the latest detection card.
+  Widget _buildDetectionMetric(IconData icon, String value, String label) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -429,6 +347,8 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 8),
         Text(
           value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -522,49 +442,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // Navigation Item
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-    required Color primaryColor,
-    VoidCallback? onTap,
-  }) {
-    final isSelected = _selectedTab == index;
-    final activeColor = primaryColor;
-    final inactiveColor = Colors.grey.shade400;
-
-    return InkWell(
-      onTap: onTap ?? () => setState(() => _selectedTab = index),
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? activeColor : inactiveColor,
-                size: 32,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                  color: isSelected ? activeColor : inactiveColor,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

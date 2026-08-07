@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../core/no_transition_route.dart';
+import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
 import 'auth/login_screen.dart';
-import 'home_screen.dart';
 import 'scan_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -142,92 +142,14 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
 
-      // --- Enlarged Center Action Button (Scan) ---
+      // --- Centre Scan Button ---
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Container(
-        height: 76,
-        width: 76,
-        margin: const EdgeInsets.only(top: 10),
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: _primaryColor.withValues(alpha: 0.15),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: _primaryColor.withValues(alpha: 0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          onPressed: () =>
-              Navigator.push(context, noTransitionRoute(const ScanScreen())),
-          backgroundColor: _primaryColor,
-          elevation: 2,
-          shape: const CircleBorder(),
-          child: const Icon(
-            Icons.camera_alt_rounded,
-            size: 32,
-            color: Colors.white,
-          ),
-        ),
+      floatingActionButton: AppScanButton(
+        onPressed: () =>
+            Navigator.push(context, noTransitionRoute(const ScanScreen())),
       ),
 
-      // --- Bottom Navigation Bar ---
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 20,
-              spreadRadius: 0,
-              offset: const Offset(0, -6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          child: BottomAppBar(
-            shape: const CircularNotchedRectangle(),
-            notchMargin: 10.0,
-            clipBehavior: Clip.antiAlias,
-            color: Colors.white,
-            elevation: 0,
-            child: SizedBox(
-              height: 76,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Left Tab: Home
-                  _buildNavItem(
-                    icon: Icons.home_rounded,
-                    label: 'Home',
-                    selected: false,
-                    onTap: () => Navigator.pushReplacement(
-                      context,
-                      noTransitionRoute(const HomeScreen()),
-                    ),
-                  ),
-
-                  // Spacer for the center Scan FloatingActionButton
-                  const SizedBox(width: 64),
-
-                  // Right Tab: Profile
-                  _buildNavItem(
-                    icon: Icons.person_rounded,
-                    label: 'Profile',
-                    selected: true,
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+      bottomNavigationBar: const AppBottomNav(current: AppTab.profile),
     );
   }
 
@@ -345,44 +267,4 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Navigation Item
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final activeColor = _primaryColor;
-    final inactiveColor = Colors.grey.shade400;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: selected ? activeColor : inactiveColor,
-                size: 32,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                  color: selected ? activeColor : inactiveColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

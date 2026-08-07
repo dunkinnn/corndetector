@@ -4,19 +4,28 @@ import 'package:flutter/material.dart';
 
 import '../core/colors.dart';
 
-/// Frosted-glass header shared by the Home and Monitoring dashboards.
+/// Frosted-glass header shared by the Home and Profile screens.
 /// Pair with `Scaffold(extendBodyBehindAppBar: true, ...)` and add a
 /// `SizedBox(height: AppTopBar.height + MediaQuery.of(context).padding.top)`
 /// at the top of the scrollable body so content clears the transparent bar.
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   // Default (no args): brand header with logo + "MaisNutri" wordmark.
   // Pass `title` (and optionally `description`) for a centered text header
-  // instead, e.g. the Monitoring screen.
-  const AppTopBar({super.key, this.title, this.description, this.showProfile = true});
+  // instead, e.g. the Profile screen.
+  const AppTopBar({
+    super.key,
+    this.title,
+    this.description,
+    this.showProfile = true,
+    this.showBack = false,
+  });
 
   final String? title;
   final String? description;
   final bool showProfile;
+
+  // Set on pushed sub-screens so the user can get back.
+  final bool showBack;
 
   static const double height = 70;
   static const Color _darkBlue = Color(0xFF1E293B);
@@ -36,8 +45,17 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       scrolledUnderElevation: 0,
       toolbarHeight: height,
       centerTitle: hasCustomTitle,
-      // Home and Monitoring are peer tabs, not a navigation stack.
+      // Home and Profile are peer tabs, not a navigation stack.
       automaticallyImplyLeading: false,
+      leading: showBack
+          ? IconButton(
+              onPressed: () => Navigator.maybePop(context),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: _darkBlue,
+              ),
+            )
+          : null,
       // Frosted glass: blur whatever scrolls beneath, tinted white so dark
       // text stays legible, with a hairline edge to separate it from content.
       flexibleSpace: ClipRect(
