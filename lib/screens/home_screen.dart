@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/no_transition_route.dart';
+import '../models/field_conditions.dart';
+import '../services/field_conditions_service.dart';
 import '../widgets/app_top_bar.dart';
 import 'monitoring_screen.dart';
 import 'scan_screen.dart';
@@ -12,8 +14,46 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+// Shown wherever a metric has no real data source yet.
+const String _placeholder = '--';
+
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0; // 0: Home, 1: Scan (Center), 2: Monitoring
+
+  final FieldConditionsService _conditionsService = FieldConditionsService();
+
+  FieldConditions? _conditions;
+  bool _loadingConditions = true;
+  bool _conditionsFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConditions();
+  }
+
+  // Pulls current conditions; leaves the card on placeholders if it fails.
+  Future<void> _loadConditions() async {
+    setState(() {
+      _loadingConditions = true;
+      _conditionsFailed = false;
+    });
+
+    try {
+      final conditions = await _conditionsService.fetch();
+      if (!mounted) return;
+      setState(() {
+        _conditions = conditions;
+        _loadingConditions = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingConditions = false;
+        _conditionsFailed = true;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,21 +166,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'Live Update',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                            GestureDetector(
+                              onTap: _conditionsFailed ? _loadConditions : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  _conditionsBadgeLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
@@ -152,19 +195,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             _buildWeatherMetric(
                               Icons.wb_sunny_rounded,
-                              '31°C',
+                              _conditions?.temperatureLabel ?? _placeholder,
                               'Weather',
                             ),
                             _buildDivider(),
                             _buildWeatherMetric(
                               Icons.water_drop_rounded,
-                              '68%',
+                              _conditions?.humidityLabel ?? _placeholder,
                               'Humidity',
                             ),
                             _buildDivider(),
                             _buildWeatherMetric(
                               Icons.grass_rounded,
-                              'Optimal',
+                              _conditions?.soilMoistureLabel ?? _placeholder,
                               'Soil Moisture',
                             ),
                           ],
@@ -216,9 +259,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: _buildHealthCard(
                     title: 'Healthy Crop',
-                    value: '85%',
+                    value: _placeholder,
                     color: primaryColor,
-                    progress: 0.85,
+                    progress: 0,
                     icon: Icons.check_circle_rounded,
                   ),
                 ),
@@ -226,9 +269,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: _buildHealthCard(
                     title: 'Needs Attention',
-                    value: '15%',
+                    value: _placeholder,
                     color: const Color(0xFFE65100),
-                    progress: 0.15,
+                    progress: 0,
                     icon: Icons.warning_amber_rounded,
                   ),
                 ),
@@ -361,6 +404,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  // Badge doubles as the status line for the conditions fetch.
+  String get _conditionsBadgeLabel {
+    if (_loadingConditions) return 'Updating';
+    if (_conditionsFailed) return 'Tap to retry';
+    return 'Live Update';
   }
 
   // Modern Weather Metric Component
