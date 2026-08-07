@@ -30,7 +30,6 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   static const double height = 70;
   static const Color _darkBlue = Color(0xFF1E293B);
   static const Color _textSecondary = Color(0xFF64748B);
-  static const Color _borderColor = Color(0xFFE2E8F0);
 
   @override
   Size get preferredSize => const Size.fromHeight(height);
@@ -50,10 +49,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       leading: showBack
           ? IconButton(
               onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(
-                Icons.arrow_back_rounded,
-                color: _darkBlue,
-              ),
+              icon: const Icon(Icons.arrow_back_rounded, color: _darkBlue),
             )
           : null,
       // Frosted glass: blur whatever scrolls beneath, tinted white so dark
@@ -134,23 +130,12 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
             ),
       actions: [
         IconButton(
-          // TODO: wire up once a notifications screen exists.
           onPressed: () {},
           icon: const Icon(
             Icons.notifications_none_rounded,
             color: _textSecondary,
           ),
         ),
-        if (showProfile)
-          const Padding(
-            padding: EdgeInsets.only(right: 15, left: 5),
-            // TODO: make tappable once a profile screen exists.
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: _borderColor,
-              child: Icon(Icons.person, size: 20, color: _textSecondary),
-            ),
-          ),
       ],
     );
   }
