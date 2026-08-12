@@ -1,5 +1,8 @@
 -- Corn Leaf Nutrient Deficiency Detection: Supabase schema.
 -- Run this once in your project's SQL Editor (Supabase dashboard > SQL Editor > New query > Run).
+-- For an existing project that already has the old single-detection `scans`
+-- table, run supabase/migrations/002_multi_detection_scans.sql instead -
+-- this file is the fresh-install target schema.
 
 -- 1. Profiles: one row per auth user, holds display name.
 create table if not exists public.profiles (
@@ -41,18 +44,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- 2. Scans: one row per leaf scan result.
+-- 2. Scans: one row per leaf photo. A photo can contain more than one leaf
+-- or symptom area, so the actual classification results live in
+-- scan_detections below (one scan has one or more detections).
 create table if not exists public.scans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   image_path text,
-  label text not null,
-  confidence numeric(4,3) not null,
-  symptom text not null,
-  fertilizer text not null,
-  rate text not null,
-  timing text not null,
-  note text not null,
   created_at timestamptz not null default now()
 );
 
@@ -73,7 +71,46 @@ create policy "Users can delete own scans"
   on public.scans for delete
   using (auth.uid() = user_id);
 
--- 3. Deficiency reference data: symptom and fertilizer guidance per label.
+-- 3. Scan detections: one row per detected region within a scan's photo.
+-- user_id is denormalized from the parent scan so RLS here doesn't need a
+-- join. box_* columns are the detection's location as fractions (0.0-1.0)
+-- of the photo and are nullable since not every detection is localized.
+create table if not exists public.scan_detections (
+  id uuid primary key default gen_random_uuid(),
+  scan_id uuid not null references public.scans (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  label text not null,
+  confidence numeric(4,3) not null,
+  symptom text not null,
+  fertilizer text not null,
+  rate text not null,
+  timing text not null,
+  note text not null,
+  box_left numeric(5,4),
+  box_top numeric(5,4),
+  box_width numeric(5,4),
+  box_height numeric(5,4),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists scan_detections_scan_id_idx
+  on public.scan_detections (scan_id);
+
+alter table public.scan_detections enable row level security;
+
+create policy "Users can view own scan detections"
+  on public.scan_detections for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own scan detections"
+  on public.scan_detections for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own scan detections"
+  on public.scan_detections for delete
+  using (auth.uid() = user_id);
+
+-- 4. Deficiency reference data: symptom and fertilizer guidance per label.
 -- Readable by any signed-in user; edited only via the SQL editor (no client writes).
 create table if not exists public.deficiency_reference (
   label text primary key,
@@ -118,7 +155,7 @@ values
    'Split the dose on sandy soil to limit leaching.')
 on conflict (label) do nothing;
 
--- 4. Storage bucket for scan photos (private, one folder per user).
+-- 5. Storage bucket for scan photos (private, one folder per user).
 insert into storage.buckets (id, name, public)
 values ('scan-photos', 'scan-photos', false)
 on conflict (id) do nothing;

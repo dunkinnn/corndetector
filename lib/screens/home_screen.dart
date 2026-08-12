@@ -40,13 +40,20 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Most recent scan result. Keep the result string short, e.g. "Healthy",
-  // "N Low", so it fits the card without truncating.
-  String get _latestResult =>
-      _scans.isEmpty ? _placeholder : _scans.first.label;
+  // Most recent scan's representative result (worst-case detection if the
+  // scan found more than one region - see ScanResult.primaryDetection).
+  // "+N" is appended when there were other detections in that same scan.
+  String get _latestResult {
+    if (_scans.isEmpty) return _placeholder;
+    final scan = _scans.first;
+    final label = scan.primaryDetection.label;
+    final extra = scan.detections.length - 1;
+    return extra > 0 ? '$label +$extra' : label;
+  }
+
   String get _latestConfidence => _scans.isEmpty
       ? _placeholder
-      : '${(_scans.first.confidence * 100).round()}%';
+      : '${(_scans.first.primaryDetection.confidence * 100).round()}%';
   String get _latestScanDate =>
       _scans.isEmpty ? _placeholder : _formatDate(_scans.first.createdAt);
 

@@ -1,5 +1,154 @@
 # Activity Log
 
+## 2026-08-12: Center scan button redesigned to sit flush in the navbar notch
+
+- User reported the camera FAB looked like it was "floating"/loose instead
+  of anchored to the bottom bar - not an actual layout bug (position was
+  identical and static across Home/Profile/Scan, all three use the same
+  `FloatingActionButtonLocation.centerDocked` + `AppScanButton` wiring),
+  just a visual read.
+- `lib/widgets/app_bottom_nav.dart`, `AppScanButton`: replaced the oversized
+  76dp translucent green halo (`_primaryColor` alpha 0.15 circle with a
+  blurred colored shadow) with a 68dp solid white ring matching the bar's
+  own surface color, a subtle neutral shadow (black alpha 0.08 instead of
+  colored), and lower elevation (2 -> 1) on the inner button. The white
+  ring reads as a continuation of the bar surface wrapping the notch,
+  instead of a separate glowing circle hovering above it. Icon size
+  26 (was 32) to match the smaller button.
+
+## 2026-08-12: Multi-detection support (multiple leaves/regions per scan)
+
+- Follow-up to the bounding box entry below - user asked what happens with
+  "too many leaves" in one photo, then chose full multi-result support:
+  each detected region gets its own label/confidence/box/recommendation,
+  saved per region instead of per scan.
+- `lib/models/scan_result.dart`: reworked. Added `Detection` (label,
+  confidence, symptom, fertilizer, rate, timing, note, optional
+  `DetectionBox`) and `DetectionBox` (fractional left/top/width/height).
+  `ScanResult` is now id/createdAt/imagePath/`List<Detection> detections`
+  (previously the single-detection fields lived directly on ScanResult).
+  Added `ScanResult.isHealthy` (true only if every detection is Healthy)
+  and `ScanResult.primaryDetection` (highest-confidence non-healthy
+  detection, or the first one if the whole scan is healthy) for callers
+  that need one representative result.
+- `supabase/schema.sql`: `scans` is now photo-level only (id, user_id,
+  image_path, created_at). Added `scan_detections` (one row per detected
+  region: label, confidence, symptom, fertilizer, rate, timing, note,
+  box_left/top/width/height, scan_id FK, user_id denormalized for RLS).
+  Added `supabase/migrations/002_multi_detection_scans.sql` for the
+  already-deployed project - backfills existing `scans` rows into
+  `scan_detections` (box_* left null, no detection had a location before
+  this) before dropping the old columns from `scans`. Safe to run twice.
+  **User must run this migration manually in the Supabase SQL Editor -
+  this session cannot reach *.supabase.co (see the 2026-08-12 Supabase
+  wiring entry below).** Existing scan history is preserved by the
+  backfill, not lost.
+- `lib/services/scan_service.dart`: `saveScan` now takes
+  `List<Detection> detections` and writes one `scans` row plus a batch
+  insert into `scan_detections`. `getHistory` now selects
+  `'*, scan_detections(*)'` so each `ScanResult` comes back with its full
+  detection list already joined.
+- `lib/screens/scan_screen.dart`: `_analyze()` now calls
+  `_pickMockOutcomes()` instead of picking one outcome. Healthy is still
+  never mixed with a deficiency (a photo is either all-healthy, 35% odds,
+  or has 1-3 distinct deficiency detections - kept distinct so their fixed
+  mock boxes, one per label, don't sit on top of each other; a real
+  YOLOv8 model would give each detection its own real box instead).
+  `_outcome` (single) is now `_outcomes` (list) throughout. Analysis and
+  result steps draw one bounding box per outcome. Result step shows a
+  "N regions detected" heading (only when >1) then one classification +
+  recommendation card pair per detection; extracted the classification
+  summary into `_buildOutcomeCard` so it can repeat per detection.
+- `lib/screens/scan_history_screen.dart`: each history card now shows a
+  Wrap of one chip per detection (label + confidence) instead of a single
+  label/confidence pair.
+- `lib/screens/deficiency_alerts_screen.dart`: alerts are now flattened to
+  one card per non-healthy detection across all scans (new private
+  `_AlertItem` pairing a `Detection` with its parent scan's date), instead
+  of one card per non-healthy scan - a scan with one healthy and one
+  deficient detection now correctly surfaces the deficient one here.
+- `lib/screens/home_screen.dart`: `_latestResult`/`_latestConfidence` now
+  read `_scans.first.primaryDetection` instead of fields that no longer
+  exist directly on `ScanResult`. `_latestResult` appends `+N` when the
+  latest scan has more than one detection (e.g. "Nitrogen Deficiency +1").
+  `_healthyCount`/`_deficientCount` are unchanged (still scan-level via
+  `ScanResult.isHealthy`, which now means "every detection in the scan is
+  healthy").
+- Not done / worth flagging: no dedicated UI yet for a scan that mixes a
+  healthy leaf with a deficient one in the same photo (currently just
+  shows both cards) - fine for a thesis-scope mock, worth a design pass
+  once the real YOLOv8 model can actually produce this mix. Also, this
+  sandbox cannot run `flutter analyze` (Flutter/Dart not installed here) -
+  changes were checked by hand (brace/paren balance, grep for stale
+  references to the old single-detection fields) but not compiled; run
+  `flutter analyze` locally before trusting this fully.
+
+## 2026-08-12: Mocked bounding box overlay + bigger scan-screen image
+
+- User asked for the scan screen to show a bounding box drawn directly on the
+  photo, and for the photo display to be bigger from the capture step through
+  the result step so the box is clearly visible. The paper (`CORNLEAFNUTRIENTDEFICIENCIESDETECTIONPAPER.pdf`)
+  specifies YOLOv8 for real detection/localization + EfficientNetB0 for
+  classification, but neither is wired up yet - `_analyze()` is still the
+  existing mock (random pick from `_mockOutcomes`, see its TODO). There is no
+  real detection output to draw a box from yet.
+- Added `_BoundingBox` (fractional left/top/width/height, 0.0-1.0) and a
+  `box` field on `_ScanOutcome`, with one hand-picked mock rect per outcome
+  (healthy/N/P/K) in `scan_screen.dart`. `_analyze()` now picks the outcome
+  upfront instead of after the fake delay, so the box is already known while
+  the analysis step "runs", not just at the result step.
+- Added `_buildBoundingBoxOverlay` (LayoutBuilder + Positioned + Container
+  border, no new dependency) drawn on top of the photo in both the analysis
+  and result steps, with a colored label chip matching the outcome.
+- Enlarged the photo container across all three steps: capture 260 -> 320,
+  analysis 240 -> 320, result 200 -> 300 (now a Stack instead of a bare
+  `Image.file` so the overlay can sit on top).
+- Not real detection: the box position is a fixed mock per outcome, not
+  computed from the photo. Swapping `_analyze()` for a real YOLOv8 call
+  (per the TODO) should return real bounding box coordinates and populate
+  `_ScanOutcome.box` (or a separate per-scan box) from that instead of the
+  hand-picked mock values here.
+
+## 2026-08-12: Replaced camera capture with in-app live preview (camera package)
+
+- Root cause of a long-running bug: "Take Photo" used image_picker's
+  `ImageSource.camera`, which launches the system Camera app via intent and
+  backgrounds this app while it's open. Android was killing the app's
+  process while backgrounded (common on real devices, not just an emulator
+  quirk), losing the in-progress navigation state and the captured photo.
+  Two rounds of trying to recover from this after the fact (a pending-capture
+  flag + `ImagePicker().retrieveLostData()` in `home_screen.dart`, then
+  dropping the picker's `maxWidth`/`imageQuality` resize) did not make
+  recovery reliable - confirmed by testing on-device.
+- Fix: added `lib/screens/scan/camera_capture_screen.dart`, a full-screen
+  live preview using the `camera` package. `scan_screen.dart`'s "Take Photo"
+  now pushes this screen and gets the file back via `Navigator.pop`, instead
+  of calling the picker with `ImageSource.camera`. This keeps the app in the
+  foreground for the whole capture, so there's no external app to lose focus
+  to and nothing to recover - Android has no reason to kill it.
+- Removed the now-unnecessary recovery plumbing: `ScanScreen.initialImage`,
+  `HomeScreen._recoverLostCapture`/`_checkingRecovery` and its loading
+  screen, and `lib/core/pending_capture.dart` (now unused - **should be
+  deleted manually**, this session can't delete files on the user's machine).
+  Gallery upload (`_pickFromGallery`) is unchanged and still uses image_picker.
+- Added `camera: ^0.12.0+2` to `pubspec.yaml`.
+- Re-added `android.permission.CAMERA` to `AndroidManifest.xml`. Note this
+  directly reverses the 2026-08-03 entry below ("Removed
+  `android.permission.CAMERA`...") - that removal was correct for the old
+  intent-based capture, which delegated permission handling to the system
+  Camera app. The `camera` package opens the hardware directly from within
+  this app, so it now needs and must request this permission itself. If a
+  future change reintroduces intent-based capture, re-remove it as before.
+- Also fixed a separate, unrelated UI bug found during this work: the
+  camera FAB (`AppScanButton` in `app_bottom_nav.dart`) twitched when
+  navigating between screens because every instance shared Flutter's
+  default `heroTag`. Fixed with `heroTag: null`.
+- Not yet done: no flash toggle or front/back camera switch in the new
+  camera screen (kept minimal - back camera only, matches the leaf-scanning
+  use case). Photos are captured at full camera resolution (no
+  resize/compress before upload) - worth revisiting if upload size/time to
+  Supabase becomes a problem.
+
 ## 2026-08-12: Fixed deprecated withOpacity() calls in profile_screen.dart
 
 - Replaced 3 uses of the deprecated `Color.withOpacity()` with

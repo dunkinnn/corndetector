@@ -14,7 +14,6 @@ class ScanHistoryScreen extends StatefulWidget {
 
 class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
   static const Color _primaryColor = Color(0xFF2E7D32);
-  static const Color _darkText = Color(0xFF1E293B);
 
   late final Future<List<ScanResult>> _historyFuture;
 
@@ -77,6 +76,9 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
     );
   }
 
+  // A scan can hold more than one detection (photo had more than one leaf
+  // or symptom area), so the label/confidence pair from the old single-
+  // detection card is now one chip per detection instead of a fixed column.
   Widget _buildScanCard(ScanResult scan) {
     final color = scan.isHealthy ? _primaryColor : const Color(0xFFDC2626);
     return Container(
@@ -88,6 +90,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
         border: Border.all(color: Colors.grey.shade100),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(10),
@@ -108,14 +111,14 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  scan.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: _darkText,
-                  ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: scan.detections
+                      .map(_buildDetectionChip)
+                      .toList(),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
                 Text(
                   _formatDate(scan.createdAt),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
@@ -123,11 +126,26 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
               ],
             ),
           ),
-          Text(
-            '${(scan.confidence * 100).round()}%',
-            style: TextStyle(fontWeight: FontWeight.bold, color: color),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDetectionChip(Detection detection) {
+    final color = detection.isHealthy ? _primaryColor : const Color(0xFFDC2626);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '${detection.label} ${(detection.confidence * 100).round()}%',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
       ),
     );
   }

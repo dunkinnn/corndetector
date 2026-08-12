@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,8 +20,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _auth = const AuthService();
+  static const _secureStorage = FlutterSecureStorage();
 
-  bool _rememberEmail = true;
+  bool _rememberMe = false;
   bool _obscurePassword = true;
 
   final TextEditingController _emailController = TextEditingController();
@@ -36,21 +38,25 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedEmail();
+    _loadSavedCredentials();
   }
 
-  Future<void> _loadSavedEmail() async {
+  Future<void> _loadSavedCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     // Drop any plaintext password saved by older builds of this screen.
     await prefs.remove('saved_password');
 
     final savedEmail = prefs.getString('saved_email');
-    final rememberPref = prefs.getBool('remember_email') ?? true;
+    final rememberPref = prefs.getBool('remember_email') ?? false;
+    final savedPassword = rememberPref
+        ? await _secureStorage.read(key: 'saved_password')
+        : null;
 
     if (mounted) {
       setState(() {
-        _rememberEmail = rememberPref;
+        _rememberMe = rememberPref;
         if (savedEmail != null) _emailController.text = savedEmail;
+        if (savedPassword != null) _passwordController.text = savedPassword;
       });
     }
   }
@@ -86,11 +92,16 @@ class _LoginScreenState extends State<LoginScreen> {
       await _auth.signIn(email: email, password: _passwordController.text);
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('remember_email', _rememberEmail);
-      if (_rememberEmail) {
+      await prefs.setBool('remember_email', _rememberMe);
+      if (_rememberMe) {
         await prefs.setString('saved_email', email);
+        await _secureStorage.write(
+          key: 'saved_password',
+          value: _passwordController.text,
+        );
       } else {
         await prefs.remove('saved_email');
+        await _secureStorage.delete(key: 'saved_password');
       }
 
       if (!mounted) return;
@@ -230,18 +241,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 24,
                         width: 24,
                         child: Checkbox(
-                          value: _rememberEmail,
+                          value: _rememberMe,
                           activeColor: AppColors.brandGreen,
                           onChanged: (value) {
                             setState(() {
-                              _rememberEmail = value!;
+                              _rememberMe = value!;
                             });
                           },
                         ),
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Remember Email',
+                        'Remember Me',
                         style: TextStyle(
                           color: AppColors.brandGreen,
                           fontWeight: FontWeight.w600,

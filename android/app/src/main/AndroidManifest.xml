@@ -3,6 +3,13 @@
          debug/profile manifests already get this from the Flutter tool, but
          release only uses this file. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required by the `camera` package for its in-app live preview (see
+         camera_capture_screen.dart). Unlike image_picker's old intent-based
+         capture (which needed no permission of ours - the system Camera app
+         handled its own), this app now opens the camera hardware directly,
+         so it must declare and be granted this permission itself. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="corn_detection"
         android:name="${applicationName}"

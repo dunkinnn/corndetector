@@ -10,9 +10,13 @@ enum AppTab { home, profile, none }
 // Bottom bar shared by every top-level screen, with a notch for the scan
 // button. Home and Profile are peer tabs, so they replace each other.
 class AppBottomNav extends StatelessWidget {
-  const AppBottomNav({super.key, required this.current});
+  const AppBottomNav({super.key, required this.current, this.onBeforeLeave});
 
   final AppTab current;
+
+  // Called before switching tabs; return false to cancel the navigation
+  // (e.g. to warn about an unsaved scan result). Defaults to always allowing.
+  final Future<bool> Function()? onBeforeLeave;
 
   static const Color _primaryColor = Color(0xFF2E7D32);
 
@@ -70,8 +74,10 @@ class AppBottomNav extends StatelessWidget {
   }
 
   // Skips navigation when the tab is already showing.
-  void _goTo(BuildContext context, Widget page, AppTab tab) {
+  Future<void> _goTo(BuildContext context, Widget page, AppTab tab) async {
     if (current == tab) return;
+    if (onBeforeLeave != null && !await onBeforeLeave!()) return;
+    if (!context.mounted) return;
     Navigator.pushReplacement(context, noTransitionRoute(page));
   }
 
@@ -115,7 +121,10 @@ class AppBottomNav extends StatelessWidget {
   }
 }
 
-// Centre scan button that docks into the bottom bar notch.
+// Centre scan button that docks into the bottom bar notch. A white ring
+// (matching the bar's own surface color) seats it flush into the notch
+// instead of the old oversized translucent halo, which read as a loose
+// floating circle rather than a button anchored to the bar.
 class AppScanButton extends StatelessWidget {
   const AppScanButton({super.key, required this.onPressed});
 
@@ -126,29 +135,32 @@ class AppScanButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 76,
-      width: 76,
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(6),
+      height: 68,
+      width: 68,
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: _primaryColor.withValues(alpha: 0.15),
+        color: Colors.white,
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: _primaryColor.withValues(alpha: 0.25),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: FloatingActionButton(
+        // Every screen has its own instance of this button; without an
+        // explicit tag they'd all share Flutter's default hero tag, which
+        // makes it flight-animate (visible as a twitch) between screens.
+        heroTag: null,
         onPressed: onPressed,
         backgroundColor: _primaryColor,
-        elevation: 2,
+        elevation: 1,
         shape: const CircleBorder(),
         child: const Icon(
           Icons.camera_alt_rounded,
-          size: 32,
+          size: 26,
           color: Colors.white,
         ),
       ),

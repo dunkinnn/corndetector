@@ -5,6 +5,16 @@ import '../services/scan_service.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/empty_state.dart';
 
+// One non-healthy detection plus the date of the scan it came from - a scan
+// can hold several detections, so alerts are flattened to one per
+// detection rather than one per scan.
+class _AlertItem {
+  const _AlertItem({required this.detection, required this.scanDate});
+
+  final Detection detection;
+  final DateTime scanDate;
+}
+
 class DeficiencyAlertsScreen extends StatefulWidget {
   const DeficiencyAlertsScreen({super.key});
 
@@ -17,14 +27,19 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
   static const Color _darkText = Color(0xFF1E293B);
   static const Color _alertColor = Color(0xFFDC2626);
 
-  late final Future<List<ScanResult>> _alertsFuture;
+  late final Future<List<_AlertItem>> _alertsFuture;
 
   @override
   void initState() {
     super.initState();
-    _alertsFuture = const ScanService()
-        .getHistory()
-        .then((scans) => scans.where((s) => !s.isHealthy).toList());
+    _alertsFuture = const ScanService().getHistory().then(
+      (scans) => [
+        for (final scan in scans)
+          for (final detection in scan.detections)
+            if (!detection.isHealthy)
+              _AlertItem(detection: detection, scanDate: scan.createdAt),
+      ],
+    );
   }
 
   @override
@@ -49,7 +64,7 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
               height:
                   MediaQuery.of(context).padding.top + AppTopBar.height + 20,
             ),
-            FutureBuilder<List<ScanResult>>(
+            FutureBuilder<List<_AlertItem>>(
               future: _alertsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
@@ -80,7 +95,8 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
     );
   }
 
-  Widget _buildAlertCard(ScanResult scan) {
+  Widget _buildAlertCard(_AlertItem item) {
+    final detection = item.detection;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -98,7 +114,7 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  scan.label,
+                  detection.label,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: _alertColor,
@@ -106,7 +122,7 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
                 ),
               ),
               Text(
-                '${(scan.confidence * 100).round()}%',
+                '${(detection.confidence * 100).round()}%',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: _alertColor,
@@ -116,11 +132,18 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            scan.symptom,
+            detection.symptom,
             style: const TextStyle(fontSize: 13, color: _darkText, height: 1.4),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _formatDate(item.scanDate),
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
         ],
       ),
     );
   }
+
+  String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
 }

@@ -3,24 +3,24 @@ import 'dart:io';
 import '../core/supabase_config.dart';
 import '../models/scan_result.dart';
 
-// Persists leaf scan results and photos, and reads them back per user.
+// Persists leaf scan results and photos, and reads them back per user. A
+// scan can hold more than one detection (a photo with more than one leaf
+// or symptom area), so this writes one `scans` row plus one
+// `scan_detections` row per detection.
 class ScanService {
   const ScanService();
 
   static const _bucket = 'scan-photos';
 
   Future<ScanResult> saveScan({
-    required String label,
-    required double confidence,
-    required String symptom,
-    required String fertilizer,
-    required String rate,
-    required String timing,
-    required String note,
+    required List<Detection> detections,
     File? photo,
   }) async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) throw StateError('No signed-in user.');
+    if (detections.isEmpty) {
+      throw ArgumentError('A scan needs at least one detection.');
+    }
 
     String? imagePath;
     if (photo != null) {
@@ -28,23 +28,26 @@ class ScanService {
       await supabase.storage.from(_bucket).upload(imagePath, photo);
     }
 
-    final row = await supabase
+    final scanRow = await supabase
         .from('scans')
-        .insert({
-          'user_id': userId,
-          'image_path': imagePath,
-          'label': label,
-          'confidence': confidence,
-          'symptom': symptom,
-          'fertilizer': fertilizer,
-          'rate': rate,
-          'timing': timing,
-          'note': note,
-        })
+        .insert({'user_id': userId, 'image_path': imagePath})
         .select()
         .single();
+    final scanId = scanRow['id'] as String;
 
-    return ScanResult.fromMap(row);
+    final detectionRows = await supabase
+        .from('scan_detections')
+        .insert([
+          for (final detection in detections)
+            {
+              'scan_id': scanId,
+              'user_id': userId,
+              ...detection.toInsertMap(),
+            },
+        ])
+        .select();
+
+    return ScanResult.fromMap({...scanRow, 'scan_detections': detectionRows});
   }
 
   Future<List<ScanResult>> getHistory() async {
@@ -52,7 +55,7 @@ class ScanService {
     if (userId == null) return [];
     final rows = await supabase
         .from('scans')
-        .select()
+        .select('*, scan_detections(*)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
     return rows.map(ScanResult.fromMap).toList();

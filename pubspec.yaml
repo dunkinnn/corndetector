@@ -35,11 +35,20 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-  # Local key-value storage, used for the "Save Password" login preference.
+  # Local key-value storage, used for the "Remember Me" saved email.
   shared_preferences: ^2.3.2
 
-  # Camera/gallery photo selection for the leaf scan flow.
+  # OS-encrypted storage (Keychain/Keystore), used for the saved login password.
+  flutter_secure_storage: ^9.2.2
+
+  # Gallery photo selection for the leaf scan flow (camera capture uses the
+  # in-app live preview below instead - see camera_capture_screen.dart).
   image_picker: ^1.1.2
+
+  # In-app live camera preview for leaf capture. Used instead of launching
+  # the system Camera app so this app stays foregrounded during capture -
+  # Android was killing it mid-capture when a separate Camera app had focus.
+  camera: ^0.12.0+2
 
   # Backend: auth, database, and storage for profiles, scans, and reference data.
   supabase_flutter: ^2.17.1

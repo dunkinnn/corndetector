@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -5,14 +6,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:image_picker/image_picker.dart';
 
+import '../models/scan_result.dart';
 import '../services/scan_service.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
+import 'scan/camera_capture_screen.dart';
 
 const Color _primaryColor = Color(0xFF2E7D32); // Modern Emerald Green
 const Color _darkText = Color(0xFF1E293B);
 
 enum _ScanStep { capture, analysis, result }
+
+// Which source the "Add a Leaf Photo" bottom sheet was tapped for.
+enum _ImageSource { camera, gallery }
+
+// Choice offered when leaving an unsaved result (back gesture or bottom nav).
+enum _LeaveAction { save, discard, cancel }
+
+// Cycled during the analysis step so farmers see what's actually happening
+// instead of a bare spinner. Purely cosmetic - the mock model doesn't run
+// these as real substeps (see the TODO on _analyze).
+const List<String> _analysisMessages = [
+  'Reading leaf color pattern...',
+  'Checking for Nitrogen signs...',
+  'Checking for Phosphorus signs...',
+  'Checking for Potassium signs...',
+  'Comparing to a healthy leaf...',
+];
 
 // Fertilizer the system recommends for a given classification.
 class _Recommendation {
@@ -30,7 +50,9 @@ class _Recommendation {
 }
 
 // One possible detection outcome. The model only detects and classifies;
-// the recommendation below is derived from the resulting class.
+// the recommendation below is derived from the resulting class. A scan can
+// produce more than one of these when a photo has more than one leaf or
+// symptom area (see _analyze).
 class _ScanOutcome {
   const _ScanOutcome({
     required this.label,
@@ -40,6 +62,7 @@ class _ScanOutcome {
     required this.icon,
     required this.symptom,
     required this.recommendation,
+    required this.box,
   });
 
   final String label;
@@ -49,6 +72,19 @@ class _ScanOutcome {
   final IconData icon;
   final String symptom;
   final _Recommendation recommendation;
+  final DetectionBox box; // Mocked until _analyze calls a real YOLOv8 detector.
+
+  // Converts this mock outcome to the shared model saved via ScanService.
+  Detection toDetection() => Detection(
+    label: label,
+    confidence: confidence,
+    symptom: symptom,
+    fertilizer: recommendation.fertilizer,
+    rate: recommendation.rate,
+    timing: recommendation.timing,
+    note: recommendation.note,
+    box: box,
+  );
 }
 
 const List<_ScanOutcome> _mockOutcomes = [
@@ -65,6 +101,7 @@ const List<_ScanOutcome> _mockOutcomes = [
       timing: 'Next scheduled application',
       note: 'Re-scan in 7 to 10 days to confirm the crop stays on track.',
     ),
+    box: DetectionBox(left: 0.14, top: 0.16, width: 0.72, height: 0.68),
   ),
   _ScanOutcome(
     label: 'Nitrogen Deficiency',
@@ -79,6 +116,7 @@ const List<_ScanOutcome> _mockOutcomes = [
       timing: 'Side-dress at V6 to V8, before tasseling',
       note: 'Apply to moist soil and cover lightly to reduce loss to the air.',
     ),
+    box: DetectionBox(left: 0.30, top: 0.32, width: 0.42, height: 0.40),
   ),
   _ScanOutcome(
     label: 'Phosphorus Deficiency',
@@ -93,6 +131,7 @@ const List<_ScanOutcome> _mockOutcomes = [
       timing: 'Band near the root zone at planting or early vegetative',
       note: 'Check soil pH; uptake drops sharply in strongly acidic soil.',
     ),
+    box: DetectionBox(left: 0.06, top: 0.12, width: 0.30, height: 0.52),
   ),
   _ScanOutcome(
     label: 'Potassium Deficiency',
@@ -107,6 +146,7 @@ const List<_ScanOutcome> _mockOutcomes = [
       timing: 'Apply during early vegetative growth',
       note: 'Split the dose on sandy soil to limit leaching.',
     ),
+    box: DetectionBox(left: 0.62, top: 0.14, width: 0.32, height: 0.56),
   ),
 ];
 
@@ -122,12 +162,23 @@ class _ScanScreenState extends State<ScanScreen> {
 
   _ScanStep _step = _ScanStep.capture;
   File? _image;
-  _ScanOutcome? _outcome;
+  List<_ScanOutcome> _outcomes = []; // One entry per detected leaf/region.
   bool _isPicking = false; // Guards against double-taps re-entering the picker.
+  bool _isSaving = false;
+  bool _isSaved = false;
+
+  // True only when `_image` is a temp file our own in-app camera wrote (see
+  // camera_capture_screen.dart) - safe for us to delete. Gallery picks may
+  // point at the user's actual photo library, so those are never deleted,
+  // only ever dropped from our reference to them.
+  bool _imageIsOwnedTempFile = false;
+
+  Timer? _analysisTimer;
+  int _analysisMessageIndex = 0;
 
   // Lets the user choose whether to take a new photo or upload an existing one.
   Future<void> _showImageSourceSheet() async {
-    final source = await showModalBottomSheet<ImageSource>(
+    final choice = await showModalBottomSheet<_ImageSource>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
@@ -142,7 +193,7 @@ class _ScanScreenState extends State<ScanScreen> {
                 color: _primaryColor,
               ),
               title: const Text('Take Photo'),
-              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              onTap: () => Navigator.pop(sheetContext, _ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(
@@ -150,34 +201,52 @@ class _ScanScreenState extends State<ScanScreen> {
                 color: _primaryColor,
               ),
               title: const Text('Upload from Gallery'),
-              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              onTap: () => Navigator.pop(sheetContext, _ImageSource.gallery),
             ),
           ],
         ),
       ),
     );
-    if (source != null) await _pickImage(source);
+    if (choice == _ImageSource.camera) {
+      await _openInAppCamera();
+    } else if (choice == _ImageSource.gallery) {
+      await _pickFromGallery();
+    }
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  // In-app live camera preview (see camera_capture_screen.dart), used
+  // instead of the system Camera app so this screen stays in the foreground
+  // the whole time a photo is being taken.
+  Future<void> _openInAppCamera() async {
+    final photo = await Navigator.push<File>(
+      context,
+      MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+    );
+    if (photo != null && mounted) {
+      _dropCurrentImage(); // Replacing an existing pick, if any.
+      setState(() {
+        _image = photo;
+        _imageIsOwnedTempFile = true;
+      });
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
     if (_isPicking) return;
     _isPicking = true;
     try {
-      final picked = await _picker.pickImage(
-        source: source,
-        maxWidth: 1600,
-        imageQuality: 85,
-      );
+      final picked = await _picker.pickImage(source: ImageSource.gallery);
       if (picked == null || !mounted) return;
-      setState(() => _image = File(picked.path));
+      _dropCurrentImage(); // Replacing an existing pick, if any.
+      setState(() {
+        _image = File(picked.path);
+        _imageIsOwnedTempFile = false; // May be the user's own gallery file.
+      });
     } on PlatformException catch (e) {
       if (!mounted) return;
-      final isCamera = source == ImageSource.camera;
-      final message = e.code == 'camera_access_denied'
-          ? 'Camera access denied. Enable it in your device settings.'
-          : e.code == 'photo_access_denied'
+      final message = e.code == 'photo_access_denied'
           ? 'Photo library access denied. Enable it in your device settings.'
-          : 'Could not open the ${isCamera ? 'camera' : 'gallery'}. Please try again.';
+          : 'Could not open the gallery. Please try again.';
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
@@ -186,100 +255,222 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  // Picks 1-3 mock detections for this photo, simulating a scan that finds
+  // more than one leaf/symptom area. Healthy is never mixed with a
+  // deficiency - a photo is either all-healthy or has one or more
+  // deficiency detections, each a distinct label so their (also distinct)
+  // mock boxes don't sit on top of each other.
+  List<_ScanOutcome> _pickMockOutcomes() {
+    final rng = Random();
+    final healthy = _mockOutcomes.first;
+    if (rng.nextDouble() < 0.35) return [healthy];
+    final deficiencies = _mockOutcomes.skip(1).toList()..shuffle(rng);
+    final count = 1 + rng.nextInt(deficiencies.length);
+    return deficiencies.take(count).toList();
+  }
+
   // TODO: swap this simulated delay + random pick for a real on-device or
   // API-based nutrient-deficiency detection model.
   Future<void> _analyze() async {
     if (_image == null) return;
-    setState(() => _step = _ScanStep.analysis);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    final outcome = _mockOutcomes[Random().nextInt(_mockOutcomes.length)];
+    // Picked upfront (not after the delay) so the bounding boxes are
+    // already known and can be drawn over the photo while the analysis
+    // step "runs".
+    final outcomes = _pickMockOutcomes();
     setState(() {
-      _outcome = outcome;
-      _step = _ScanStep.result;
+      _outcomes = outcomes;
+      _step = _ScanStep.analysis;
+      _analysisMessageIndex = 0;
     });
-    _persistScan(outcome);
+    _analysisTimer = Timer.periodic(const Duration(milliseconds: 650), (_) {
+      if (!mounted) return;
+      setState(() {
+        _analysisMessageIndex =
+            (_analysisMessageIndex + 1) % _analysisMessages.length;
+      });
+    });
+    await Future.delayed(const Duration(seconds: 2));
+    _analysisTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _step = _ScanStep.result);
+    // Not saved yet - the farmer confirms with the Save Result button below,
+    // so a result they don't want doesn't end up in their history.
   }
 
-  // Saves the (mocked) result and photo to Supabase so it shows up in scan
-  // history and deficiency alerts. Failures don't block the UI - the result
-  // is already shown from the local mock regardless of sync success.
-  Future<void> _persistScan(_ScanOutcome outcome) async {
+  // Saves the (mocked) results and photo to Supabase so they show up in
+  // scan history and deficiency alerts. Only runs when the user taps Save
+  // Result. One scan row is written with one detection row per outcome.
+  Future<void> _saveResult() async {
+    if (_outcomes.isEmpty || _isSaving || _isSaved) return;
+    setState(() => _isSaving = true);
     try {
       await const ScanService().saveScan(
-        label: outcome.label,
-        confidence: outcome.confidence,
-        symptom: outcome.symptom,
-        fertilizer: outcome.recommendation.fertilizer,
-        rate: outcome.recommendation.rate,
-        timing: outcome.recommendation.timing,
-        note: outcome.recommendation.note,
+        detections: _outcomes.map((o) => o.toDetection()).toList(),
         photo: _image,
       );
+      if (mounted) setState(() => _isSaved = true);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not sync this result to your account.'),
+            content: Text('Could not save this result. Please try again.'),
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  bool get _hasUnsavedResult => _step == _ScanStep.result && !_isSaved;
+
+  // Guards every way off this screen (back gesture, bottom nav, the center
+  // FAB) so a completed-but-unsaved result never disappears silently - the
+  // farmer has to actively choose to save or discard it first.
+  Future<bool> _confirmLeaveIfUnsaved() async {
+    if (!_hasUnsavedResult) return true;
+    final action = await showDialog<_LeaveAction>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Unsaved Scan Result'),
+        content: const Text(
+          "This result hasn't been saved yet. Leaving now will discard it.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _LeaveAction.cancel),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _LeaveAction.discard),
+            child: const Text('Discard'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, _LeaveAction.save),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    switch (action) {
+      case _LeaveAction.save:
+        await _saveResult();
+        return _isSaved; // Only leave if the save actually went through.
+      case _LeaveAction.discard:
+        return true;
+      case _LeaveAction.cancel:
+      case null:
+        return false;
     }
   }
 
   void _reset() {
+    _analysisTimer?.cancel();
+    _dropCurrentImage();
     setState(() {
       _step = _ScanStep.capture;
       _image = null;
-      _outcome = null;
+      _outcomes = [];
+      _isSaved = false;
     });
+  }
+
+  // Deletes `_image` from disk if (and only if) it's a temp file our own
+  // in-app camera wrote - never a gallery pick, which may point at the
+  // user's real photo library. Called whenever a photo is being replaced
+  // or dropped without ever being saved, so captures don't pile up in the
+  // device's temp storage.
+  void _dropCurrentImage() {
+    final image = _image;
+    if (image == null || !_imageIsOwnedTempFile) return;
+    try {
+      if (image.existsSync()) image.deleteSync();
+    } catch (_) {
+      // Best-effort - fine if it's already gone.
+    }
+  }
+
+  @override
+  void dispose() {
+    _analysisTimer?.cancel();
+    // Only clean up if the result was never saved - once _saveResult has
+    // uploaded the photo, the local temp copy is left alone.
+    if (!_isSaved) _dropCurrentImage();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF8),
-      extendBodyBehindAppBar: true,
-      appBar: const AppTopBar(
-        title: 'Detect & Classify',
-        description: 'Identify the nutrient deficiency in a corn leaf',
-        showProfile: false,
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height:
-                  MediaQuery.of(context).padding.top + AppTopBar.height + 20,
-            ),
-            _buildStepIndicator(),
-            const SizedBox(height: 24),
-            switch (_step) {
-              _ScanStep.capture => _buildCaptureStep(),
-              _ScanStep.analysis => _buildAnalysisStep(),
-              _ScanStep.result => _buildResultStep(),
-            },
-            const SizedBox(height: 110), // Space to avoid bottom bar overlap
-          ],
+    // Blocks leaving (back gesture) while there's an unsaved result -
+    // bottom nav taps and the center FAB are guarded separately below.
+    return PopScope(
+      canPop: !_hasUnsavedResult,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (await _confirmLeaveIfUnsaved() && mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAF8),
+        extendBodyBehindAppBar: true,
+        appBar: const AppTopBar(
+          title: 'Detect & Classify',
+          description: 'Identify the nutrient deficiency in a corn leaf',
+          showProfile: false,
+        ),
+        body: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20.0,
+            vertical: 8.0,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height:
+                    MediaQuery.of(context).padding.top +
+                    AppTopBar.height +
+                    20,
+              ),
+              _buildStepIndicator(),
+              const SizedBox(height: 24),
+              switch (_step) {
+                _ScanStep.capture => _buildCaptureStep(),
+                _ScanStep.analysis => _buildAnalysisStep(),
+                _ScanStep.result => _buildResultStep(),
+              },
+              const SizedBox(height: 110), // Space to avoid bottom bar overlap
+            ],
+          ),
+        ),
+
+        // --- Centre Scan Button ---
+        floatingActionButtonLocation:
+            FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: AppScanButton(
+          onPressed: () async {
+            if (_step == _ScanStep.capture) {
+              _showImageSourceSheet();
+            } else if (await _confirmLeaveIfUnsaved()) {
+              _reset();
+            }
+          },
+        ),
+
+        bottomNavigationBar: AppBottomNav(
+          current: AppTab.none,
+          onBeforeLeave: _confirmLeaveIfUnsaved,
         ),
       ),
-
-      // --- Centre Scan Button ---
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppScanButton(
-        onPressed: () {
-          if (_step == _ScanStep.capture) {
-            _showImageSourceSheet();
-          } else {
-            _reset();
-          }
-        },
-      ),
-
-      bottomNavigationBar: const AppBottomNav(current: AppTab.none),
     );
   }
 
@@ -292,7 +483,7 @@ class _ScanScreenState extends State<ScanScreen> {
           onTap: _showImageSourceSheet,
           child: Container(
             width: double.infinity,
-            height: 260,
+            height: 320,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
@@ -386,7 +577,10 @@ class _ScanScreenState extends State<ScanScreen> {
                 : Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.file(_image!, fit: BoxFit.cover),
+                      // cacheWidth downsizes during decode so a full-res
+                      // camera photo doesn't get decoded at full size just
+                      // to render into this small preview box.
+                      Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
                       Positioned(
                         right: 12,
                         top: 12,
@@ -478,131 +672,350 @@ class _ScanScreenState extends State<ScanScreen> {
 
   // --- Step 2: Analysis ---
   Widget _buildAnalysisStep() {
-    return SizedBox(
-      height: 380,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (_image != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.file(
-                _image!,
-                height: 160,
-                width: 160,
-                fit: BoxFit.cover,
-              ),
-            ),
-          const SizedBox(height: 28),
-          const CircularProgressIndicator(color: _primaryColor, strokeWidth: 3),
-          const SizedBox(height: 20),
-          const Text(
-            'Detecting and classifying...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: _darkText,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Matching the leaf against known deficiency classes',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Step 3: Result ---
-  Widget _buildResultStep() {
-    final outcome = _outcome!;
+    final outcomes = _outcomes;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_image != null)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.file(
-              _image!,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-        const SizedBox(height: 20),
+        // Same photo-card treatment as the capture step, so this feels like
+        // a continuation of the same flow rather than a different screen.
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          height: 320,
           decoration: BoxDecoration(
-            color: outcome.bgColor,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: outcome.color.withValues(alpha: 0.2)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Row(
-                children: [
-                  Icon(outcome.icon, color: outcome.color, size: 26),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      outcome.label,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: outcome.color,
+              if (_image != null)
+                Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
+              // Detection box(es) drawn directly on the photo as soon as
+              // they're known (see _analyze), so it reads as "found here"
+              // while the messages below cycle rather than only appearing
+              // at the end. One box per detected leaf/region.
+              for (final outcome in outcomes)
+                _buildBoundingBoxOverlay(
+                  outcome.box,
+                  outcome.color,
+                  outcome.label,
+                ),
+              // Scrim so the caption below stays readable over any photo.
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.05),
+                      Colors.black.withValues(alpha: 0.45),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
                       ),
                     ),
-                  ),
-                  Text(
-                    '${(outcome.confidence * 100).round()}%',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: outcome.color,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      // Cycles through _analysisMessages so it reads as
+                      // active progress rather than a screen that's stuck.
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        child: Text(
+                          _analysisMessages[_analysisMessageIndex],
+                          key: ValueKey(_analysisMessageIndex),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                outcome.symptom,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: _darkText,
-                  height: 1.4,
+                  ],
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 20),
-
-        // --- System-generated fertilizer recommendation ---
-        _buildRecommendationCard(outcome),
-        const SizedBox(height: 24),
-        SizedBox(
+        Container(
           width: double.infinity,
-          height: 54,
-          child: ElevatedButton(
-            onPressed: _reset,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade100),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const SizedBox(
+                  height: 26,
+                  width: 26,
+                  child: CircularProgressIndicator(
+                    color: _primaryColor,
+                    strokeWidth: 3,
+                  ),
+                ),
               ),
-              elevation: 0,
-            ),
-            child: const Text(
-              'Scan Another Leaf',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+              const SizedBox(height: 16),
+              const Text(
+                'Detecting and classifying...',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _darkText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'This usually takes just a few seconds.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 18),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  color: _primaryColor,
+                  backgroundColor: _primaryColor.withValues(alpha: 0.1),
+                  minHeight: 6,
+                ),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  // --- Step 3: Result ---
+  Widget _buildResultStep() {
+    final outcomes = _outcomes;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_image != null)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: SizedBox(
+              height: 300,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
+                  for (final outcome in outcomes)
+                    _buildBoundingBoxOverlay(
+                      outcome.box,
+                      outcome.color,
+                      outcome.label,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 20),
+        if (outcomes.length > 1) ...[
+          Text(
+            '${outcomes.length} regions detected',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: _darkText,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // --- One card + recommendation per detected region ---
+        for (final outcome in outcomes) ...[
+          _buildOutcomeCard(outcome),
+          const SizedBox(height: 16),
+          _buildRecommendationCard(outcome),
+          const SizedBox(height: 20),
+        ],
+
+        if (_isSaved) ...[
+          // Confirms the save actually happened, since there's no other
+          // sign of it once the button is gone.
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: _primaryColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: _primaryColor,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Saved to your history',
+                  style: TextStyle(
+                    color: _primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _reset,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Scan Another Leaf',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ] else ...[
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _saveResult,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                disabledBackgroundColor: _primaryColor.withValues(alpha: 0.6),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Text(
+                      'Save Result',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: OutlinedButton(
+              onPressed: _isSaving ? null : _reset,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.grey.shade700,
+                side: BorderSide(color: Colors.grey.shade300),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Text(
+                'Discard & Scan Another',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // --- Classification summary for one detected region ---
+  Widget _buildOutcomeCard(_ScanOutcome outcome) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: outcome.bgColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: outcome.color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(outcome.icon, color: outcome.color, size: 26),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  outcome.label,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: outcome.color,
+                  ),
+                ),
+              ),
+              Text(
+                '${(outcome.confidence * 100).round()}%',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: outcome.color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            outcome.symptom,
+            style: const TextStyle(
+              fontSize: 13,
+              color: _darkText,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -865,6 +1278,57 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Draws a detection box + label chip directly over the photo, positioned
+  // as fractions of the container so it scales with any display size.
+  Widget _buildBoundingBoxOverlay(DetectionBox box, Color color, String label) {
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) => Stack(
+          children: [
+            Positioned(
+              left: box.left * constraints.maxWidth,
+              top: box.top * constraints.maxHeight,
+              width: box.width * constraints.maxWidth,
+              height: box.height * constraints.maxHeight,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: color, width: 3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(7),
+                        bottomRight: Radius.circular(7),
+                      ),
+                    ),
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
