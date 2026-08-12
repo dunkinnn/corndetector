@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/profile_service.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/brand_text_field.dart';
 
@@ -14,11 +15,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static const Color _primaryColor = Color(0xFF2E7D32);
   static const Color _darkText = Color(0xFF1E293B);
 
-  // TODO: seed from the signed in account once auth exposes one.
-  final TextEditingController _nameController = TextEditingController(
-    text: 'Farmers',
-  );
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final profile = await const ProfileService().getCurrentProfile();
+    if (!mounted || profile == null) return;
+    setState(() {
+      _nameController.text = profile.fullName;
+      _emailController.text = profile.email;
+    });
+  }
 
   @override
   void dispose() {
@@ -27,15 +41,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  // Saving is not wired to storage yet, so tell the user plainly.
-  void _save() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saving is not available yet.'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
-      ),
-    );
+  Future<void> _save() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await const ProfileService().updateFullName(_nameController.text.trim());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile updated.'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save changes. Try again.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -62,31 +90,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
 
             // --- Avatar ---
-            Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 44,
-                    backgroundColor: _primaryColor.withValues(alpha: 0.1),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 48,
-                      color: _primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextButton(
-                    onPressed: _save,
-                    child: const Text(
-                      'Change Photo',
-                      style: TextStyle(
-                        color: _primaryColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
+            const Center(
+              child: CircleAvatar(
+                radius: 44,
+                backgroundColor: Color(0x1A2E7D32),
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 48,
+                  color: _primaryColor,
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -96,10 +108,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 18),
 
             _buildLabel('Email Address'),
-            BrandTextField(
-              hint: 'Enter your email',
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
+            IgnorePointer(
+              child: Opacity(
+                opacity: 0.6,
+                child: BrandTextField(
+                  hint: 'Enter your email',
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ),
             ),
             const SizedBox(height: 28),
 
@@ -107,7 +124,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _save,
+                onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primaryColor,
                   foregroundColor: Colors.white,
@@ -116,10 +133,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Save Changes',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Save Changes',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
 

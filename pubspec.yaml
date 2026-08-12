@@ -41,6 +41,9 @@ dependencies:
   # Camera/gallery photo selection for the leaf scan flow.
   image_picker: ^1.1.2
 
+  # Backend: auth, database, and storage for profiles, scans, and reference data.
+  supabase_flutter: ^2.17.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

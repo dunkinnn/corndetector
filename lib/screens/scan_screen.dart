@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:image_picker/image_picker.dart';
 
+import '../services/scan_service.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
 
@@ -192,10 +193,38 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() => _step = _ScanStep.analysis);
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
+    final outcome = _mockOutcomes[Random().nextInt(_mockOutcomes.length)];
     setState(() {
-      _outcome = _mockOutcomes[Random().nextInt(_mockOutcomes.length)];
+      _outcome = outcome;
       _step = _ScanStep.result;
     });
+    _persistScan(outcome);
+  }
+
+  // Saves the (mocked) result and photo to Supabase so it shows up in scan
+  // history and deficiency alerts. Failures don't block the UI - the result
+  // is already shown from the local mock regardless of sync success.
+  Future<void> _persistScan(_ScanOutcome outcome) async {
+    try {
+      await const ScanService().saveScan(
+        label: outcome.label,
+        confidence: outcome.confidence,
+        symptom: outcome.symptom,
+        fertilizer: outcome.recommendation.fertilizer,
+        rate: outcome.recommendation.rate,
+        timing: outcome.recommendation.timing,
+        note: outcome.recommendation.note,
+        photo: _image,
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not sync this result to your account.'),
+          ),
+        );
+      }
+    }
   }
 
   void _reset() {

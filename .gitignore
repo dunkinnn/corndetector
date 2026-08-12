@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Supabase project keys, passed in at build/run time via --dart-define-from-file.
+# See docs/supabase-setup.md. Never commit this file.
+supabase-keys.json
+
+# Node dependencies (used for Supabase CLI/scripts, not the Flutter app)
+node_modules/
+
+# Local scratch/cleanup folder
+_to_delete/

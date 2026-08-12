@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/colors.dart';
 import '../../core/validators.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/brand_text_field.dart';
 import '../home_screen.dart';
 
@@ -53,7 +55,7 @@ Information Collected
 Corn leaf photos you capture or upload, your account name and email, and, if you choose to enable it, the location and date associated with each diagnosis.
 
 How It's Used
-To run on-device nutrient deficiency detection, generate fertilizer recommendations, and maintain your local diagnosis history.
+To run on-device nutrient deficiency detection, generate fertilizer recommendations, and maintain your diagnosis history.
 
 Third-Party Sharing
 Captured leaf images and diagnosis results are not shared with third parties. Data collected during this research may be used in anonymized form for thesis evaluation only.
@@ -62,13 +64,13 @@ Your Rights
 You may request access to, correction of, or deletion of your account data by contacting [CONTACT EMAIL].
 
 Data Retention
-Diagnosis history is kept locally on your device until you delete it or uninstall the app.
+Diagnosis history is kept in your account until you delete it or ask us to remove it.
 
 Children
 The app is not intended for children under the applicable minimum age.
 
 Security
-Account credentials and diagnosis history are stored using standard local storage safeguards.
+Account credentials and diagnosis history are stored using industry-standard safeguards.
 
 Changes
 The Service Provider may update this policy and will notify you of material changes.
@@ -77,6 +79,8 @@ Effective [DATE]. Contact: [CONTACT EMAIL]
 ''';
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  final AuthService _auth = const AuthService();
+
   final fullNameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -177,7 +181,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _termsError == null;
   }
 
-  // Placeholder submit handler; wire up real auth logic later.
   Future<void> signUp() async {
     if (!_validate()) return;
     if (isLoading) return;
@@ -185,13 +188,31 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => isLoading = true);
 
     try {
-      await Future.delayed(const Duration(milliseconds: 400));
+      final signedIn = await _auth.signUp(
+        fullName: fullNameController.text.trim(),
+        email: emailController.text.trim(),
+        password: passwordController.text,
+      );
       if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      if (signedIn) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
+      } else {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Check your email to confirm your account, then log in.',
+            ),
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _emailError = e.message);
     } catch (e) {
       if (mounted) {
         setState(() => _emailError = 'Something went wrong. Please try again.');

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/no_transition_route.dart';
+import '../models/scan_result.dart';
+import '../services/scan_service.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
 import 'deficiency_alerts_screen.dart';
@@ -20,19 +22,41 @@ class HomeScreen extends StatefulWidget {
 const String _placeholder = '--';
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Home greets every signed-in user as "Farmer" rather than their real name.
+  static const String _displayName = 'Farmer';
+  List<ScanResult> _scans = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboard();
+  }
+
+  Future<void> _loadDashboard() async {
+    final scans = await const ScanService().getHistory();
+    if (!mounted) return;
+    setState(() {
+      _scans = scans;
+    });
+  }
+
   // Most recent scan result. Keep the result string short, e.g. "Healthy",
   // "N Low", so it fits the card without truncating.
-  // TODO: read from the stored scan history once results are persisted.
-  String get _latestResult => _placeholder;
-  String get _latestConfidence => _placeholder;
-  String get _latestScanDate => _placeholder;
+  String get _latestResult =>
+      _scans.isEmpty ? _placeholder : _scans.first.label;
+  String get _latestConfidence => _scans.isEmpty
+      ? _placeholder
+      : '${(_scans.first.confidence * 100).round()}%';
+  String get _latestScanDate =>
+      _scans.isEmpty ? _placeholder : _formatDate(_scans.first.createdAt);
 
-  // Scan counts, populated once scan results are persisted.
-  final int _healthyCount = 0;
-  final int _deficientCount = 0;
+  int get _healthyCount => _scans.where((s) => s.isHealthy).length;
+  int get _deficientCount => _scans.where((s) => !s.isHealthy).length;
 
   int get _totalScans => _healthyCount + _deficientCount;
   bool get _hasScans => _totalScans > 0;
+
+  String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
 
   // Opens a quick action sub-screen on top of Home.
   void _open(Widget page) {
@@ -79,9 +103,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'Farmers',
-                      style: TextStyle(
+                    Text(
+                      _displayName,
+                      style: const TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1E293B),

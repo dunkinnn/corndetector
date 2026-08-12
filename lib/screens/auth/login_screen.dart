@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/colors.dart';
+import '../../services/auth_service.dart';
 import '../../widgets/brand_text_field.dart';
 import '../home_screen.dart';
 import 'forgot_password_screen.dart';
@@ -16,7 +18,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _savePassword = true;
+  final AuthService _auth = const AuthService();
+
+  bool _rememberEmail = true;
   bool _obscurePassword = true;
 
   final TextEditingController _emailController = TextEditingController();
@@ -32,20 +36,21 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSavedCredentials();
+    _loadSavedEmail();
   }
 
-  Future<void> _loadSavedCredentials() async {
+  Future<void> _loadSavedEmail() async {
     final prefs = await SharedPreferences.getInstance();
+    // Drop any plaintext password saved by older builds of this screen.
+    await prefs.remove('saved_password');
+
     final savedEmail = prefs.getString('saved_email');
-    final savedPassword = prefs.getString('saved_password');
-    final savePref = prefs.getBool('save_password') ?? false;
+    final rememberPref = prefs.getBool('remember_email') ?? true;
 
     if (mounted) {
       setState(() {
-        _savePassword = savePref;
+        _rememberEmail = rememberPref;
         if (savedEmail != null) _emailController.text = savedEmail;
-        if (savedPassword != null) _passwordController.text = savedPassword;
       });
     }
   }
@@ -68,7 +73,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return valid;
   }
 
-  // Placeholder submit handler; wire up real auth logic later.
   Future<void> _handleLogin() async {
     setState(() => _authError = null);
 
@@ -78,30 +82,26 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
-      await Future.delayed(const Duration(milliseconds: 400));
+      final email = _emailController.text.trim();
+      await _auth.signIn(email: email, password: _passwordController.text);
 
-      // Handle saving/clearing credentials
       final prefs = await SharedPreferences.getInstance();
-
-      await prefs.setBool('save_password', _savePassword);
-
-      if (_savePassword) {
-        await prefs.setString('saved_email', _emailController.text.trim());
-        await prefs.setString(
-          'saved_password',
-          _passwordController.text.trim(),
-        );
+      await prefs.setBool('remember_email', _rememberEmail);
+      if (_rememberEmail) {
+        await prefs.setString('saved_email', email);
       } else {
         await prefs.remove('saved_email');
-        await prefs.remove('saved_password');
       }
 
       if (!mounted) return;
 
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
       );
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _authError = e.message);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -230,18 +230,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 24,
                         width: 24,
                         child: Checkbox(
-                          value: _savePassword,
+                          value: _rememberEmail,
                           activeColor: AppColors.brandGreen,
                           onChanged: (value) {
                             setState(() {
-                              _savePassword = value!;
+                              _rememberEmail = value!;
                             });
                           },
                         ),
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Save Password',
+                        'Remember Email',
                         style: TextStyle(
                           color: AppColors.brandGreen,
                           fontWeight: FontWeight.w600,

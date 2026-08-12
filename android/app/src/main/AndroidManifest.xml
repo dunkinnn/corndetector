@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for Supabase (and any network call) in release builds - the
+         debug/profile manifests already get this from the Flutter tool, but
+         release only uses this file. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="corn_detection"
         android:name="${applicationName}"

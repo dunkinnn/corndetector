@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/validators.dart';
+import '../../services/auth_service.dart';
 
-/// Password reset request screen; validates email locally, no backend wired up yet.
+/// Password reset request screen; sends a Supabase reset email.
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -11,6 +12,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final AuthService _auth = const AuthService();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   bool _isSubmitting = false;
@@ -22,11 +24,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  // Placeholder submit handler; wire up real password reset logic later.
+  // Always shows the generic "sent" message regardless of whether the
+  // request succeeded, so the response can't be used to enumerate accounts.
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
-    await Future.delayed(const Duration(milliseconds: 400));
+    try {
+      await _auth.sendPasswordResetEmail(_emailController.text.trim());
+    } catch (_) {
+      // Ignored: the UI always reports success either way.
+    }
     if (!mounted) return;
     setState(() {
       _isSubmitting = false;
