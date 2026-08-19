@@ -150,10 +150,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Modern Hero Header Widget
   Widget _buildModernUserHeader(BuildContext context) {
-    final displayName = (_profile?.fullName.isNotEmpty ?? false)
-        ? _profile!.fullName
+    final displayName = (_profile?.fullName.trim().isNotEmpty ?? false)
+        ? _profile!.fullName.trim()
         : 'Farmer';
-    final email = _profile?.email ?? '';
+    final email = (_profile?.email.trim().isNotEmpty ?? false)
+        ? _profile!.email.trim()
+        : '';
     final initial = displayName.isEmpty
         ? '?'
         : displayName.substring(0, 1).toUpperCase();

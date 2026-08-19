@@ -13,7 +13,28 @@ class ProfileService {
         .select()
         .eq('id', userId)
         .maybeSingle();
-    return row == null ? null : UserProfile.fromMap(row);
+    final authUser = supabase.auth.currentUser;
+    final fallbackName =
+        authUser?.userMetadata?['full_name'] as String? ?? '';
+    final fallbackEmail = authUser?.email ?? '';
+
+    if (row == null) {
+      return UserProfile(
+        id: userId,
+        fullName: fallbackName,
+        email: fallbackEmail,
+      );
+    }
+
+    return UserProfile(
+      id: row['id'] as String? ?? userId,
+      fullName: (row['full_name'] as String?)?.trim().isNotEmpty == true
+          ? row['full_name'] as String
+          : fallbackName,
+      email: (row['email'] as String?)?.trim().isNotEmpty == true
+          ? row['email'] as String
+          : fallbackEmail,
+    );
   }
 
   Future<void> updateFullName(String fullName) async {

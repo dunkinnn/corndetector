@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../core/colors.dart';
+import '../screens/deficiency_alerts_screen.dart';
 
 /// Frosted-glass header shared by the Home and Profile screens.
 /// Pair with `Scaffold(extendBodyBehindAppBar: true, ...)` and add a
@@ -130,13 +131,23 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
             ),
       actions: [
         IconButton(
-          onPressed: () {},
+          onPressed: () => _openNotifications(context),
+          tooltip: 'Notifications',
           icon: const Icon(
             Icons.notifications_none_rounded,
             color: _textSecondary,
           ),
         ),
       ],
+    );
+  }
+
+  void _openNotifications(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DeficiencyAlertsScreen(),
+      ),
     );
   }
 }
