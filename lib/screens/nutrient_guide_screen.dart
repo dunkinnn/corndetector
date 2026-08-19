@@ -109,6 +109,8 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 112),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -120,23 +122,30 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: themeColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: themeColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.eco_rounded, color: themeColor, size: 20),
                   ),
-                  child: Icon(Icons.eco_rounded, color: themeColor, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         entry.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -146,8 +155,10 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
                       const SizedBox(height: 6),
                       Text(
                         entry.symptom,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: _textMuted,
                           height: 1.3,
                         ),
