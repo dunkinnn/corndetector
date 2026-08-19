@@ -8,6 +8,7 @@ import '../services/profile_service.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
 import 'auth/login_screen.dart';
+import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'help_about_screen.dart';
 import 'settings_screen.dart';
@@ -88,6 +89,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       await _open(context, const EditProfileScreen());
                       _loadProfile();
                     },
+                  ),
+                  _buildDivider(),
+                  _buildSettingsTile(
+                    icon: Icons.lock_outline_rounded,
+                    title: 'Change Password',
+                    subtitle: 'Update your account password',
+                    onTap: () => _open(context, const ChangePasswordScreen()),
                   ),
                   _buildDivider(),
                   _buildSettingsTile(

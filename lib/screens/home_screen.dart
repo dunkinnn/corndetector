@@ -102,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       'Welcome,',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.w500,
                         color: Colors.grey.shade600,
                         letterSpacing: 0.2,
@@ -112,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       _displayName,
                       style: const TextStyle(
-                        fontSize: 26,
+                        fontSize: 30,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1E293B),
                         letterSpacing: -0.5,

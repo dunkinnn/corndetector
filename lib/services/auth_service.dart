@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../core/supabase_config.dart';
 
 // Thin wrapper around Supabase Auth for sign up, sign in, sign out, and
@@ -32,5 +34,20 @@ class AuthService {
 
   Future<void> signOut() {
     return supabase.auth.signOut();
+  }
+
+  // Re-verifies the current password before applying the new one, so a
+  // hijacked but still-signed-in session can't silently change it.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final email = supabase.auth.currentUser?.email;
+    if (email == null) throw StateError('No signed-in user.');
+    await supabase.auth.signInWithPassword(
+      email: email,
+      password: currentPassword,
+    );
+    await supabase.auth.updateUser(UserAttributes(password: newPassword));
   }
 }
