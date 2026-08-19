@@ -201,21 +201,24 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 18),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        GridView.count(
+                          crossAxisCount: 3,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 1.05,
                           children: [
                             _buildDetectionMetric(
                               Icons.grass_rounded,
                               _latestResult,
                               'Result',
                             ),
-                            _buildDivider(),
                             _buildDetectionMetric(
                               Icons.percent_rounded,
                               _latestConfidence,
                               'Confidence',
                             ),
-                            _buildDivider(),
                             _buildDetectionMetric(
                               Icons.schedule_rounded,
                               _latestScanDate,
@@ -356,46 +359,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Detection Metric Component for the latest detection card.
   Widget _buildDetectionMetric(IconData icon, String value, String label) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 20, color: Colors.white),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.white70,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider() {
     return Container(
-      height: 32,
-      width: 1,
-      color: Colors.white.withValues(alpha: 0.2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 20, color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.white,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.white70,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
