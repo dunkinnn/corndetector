@@ -463,7 +463,7 @@ class _ScanScreenState extends State<ScanScreen> {
           onTap: _showImageSourceSheet,
           child: Container(
             width: double.infinity,
-            height: 320,
+            height: 360,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
@@ -560,7 +560,7 @@ class _ScanScreenState extends State<ScanScreen> {
                       // cacheWidth downsizes during decode so a full-res
                       // camera photo doesn't get decoded at full size just
                       // to render into this small preview box.
-                      Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
+                      Image.file(_image!, fit: BoxFit.contain, cacheWidth: 800),
                       Positioned(
                         right: 12,
                         top: 12,
@@ -575,58 +575,6 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
         ),
         const SizedBox(height: 18),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.tips_and_updates_rounded,
-                  color: _primaryColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Quick tip',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: _darkText,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Use a clear close-up of one leaf in natural light. Fill most of the frame so the model can read the color and edges.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _darkText,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
           height: 54,
@@ -647,14 +595,6 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        Center(
-          child: Text(
-            'Nitrogen, phosphorus, potassium, and healthy leaf',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ),
       ],
     );
   }
@@ -668,7 +608,7 @@ class _ScanScreenState extends State<ScanScreen> {
         // a continuation of the same flow rather than a different screen.
         Container(
           width: double.infinity,
-          height: 320,
+          height: 360,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
@@ -685,7 +625,7 @@ class _ScanScreenState extends State<ScanScreen> {
             fit: StackFit.expand,
             children: [
               if (_image != null)
-                Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
+                Image.file(_image!, fit: BoxFit.contain, cacheWidth: 800),
               // Detection box(es) drawn directly on the photo as soon as
               // they're known (see _analyze), so it reads as "found here"
               // while the messages below cycle rather than only appearing
@@ -813,12 +753,12 @@ class _ScanScreenState extends State<ScanScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: SizedBox(
-              height: 300,
+              height: 340,
               width: double.infinity,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
+                  Image.file(_image!, fit: BoxFit.contain, cacheWidth: 800),
                   for (final outcome in outcomes)
                     _buildBoundingBoxOverlay(
                       outcome.box,

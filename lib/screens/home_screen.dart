@@ -201,28 +201,30 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         const SizedBox(height: 18),
-                        GridView.count(
-                          crossAxisCount: 3,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          childAspectRatio: 1.05,
+                        Row(
                           children: [
-                            _buildDetectionMetric(
-                              Icons.grass_rounded,
-                              _latestResult,
-                              'Result',
+                            Expanded(
+                              child: _buildDetectionMetric(
+                                Icons.grass_rounded,
+                                _latestResult,
+                                'Result',
+                              ),
                             ),
-                            _buildDetectionMetric(
-                              Icons.percent_rounded,
-                              _latestConfidence,
-                              'Confidence',
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildDetectionMetric(
+                                Icons.percent_rounded,
+                                _latestConfidence,
+                                'Confidence',
+                              ),
                             ),
-                            _buildDetectionMetric(
-                              Icons.schedule_rounded,
-                              _latestScanDate,
-                              'Last Scan',
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildDetectionMetric(
+                                Icons.schedule_rounded,
+                                _latestScanDate,
+                                'Last Scan',
+                              ),
                             ),
                           ],
                         ),
@@ -360,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Detection Metric Component for the latest detection card.
   Widget _buildDetectionMetric(IconData icon, String value, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
@@ -370,32 +372,31 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 20, color: Colors.white),
+            child: Icon(icon, size: 18, color: Colors.white),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             value,
-            maxLines: 2,
+            maxLines: 1,
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 13,
               color: Colors.white,
-              height: 1.1,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 10,
+              fontSize: 9,
               color: Colors.white70,
               fontWeight: FontWeight.w500,
             ),
