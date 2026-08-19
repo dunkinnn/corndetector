@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welcome back,',
+                      'Welcome,',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
