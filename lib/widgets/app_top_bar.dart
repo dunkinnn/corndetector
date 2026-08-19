@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../core/colors.dart';
-import '../screens/deficiency_alerts_screen.dart';
+import '../screens/notifications_screen.dart';
 
 /// Frosted-glass header shared by the Home and Profile screens.
 /// Pair with `Scaffold(extendBodyBehindAppBar: true, ...)` and add a
@@ -142,11 +142,16 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
+  static const _notificationsRoute = '/notifications';
+
   void _openNotifications(BuildContext context) {
-    Navigator.push(
-      context,
+    // Skip if already on the notifications screen, so repeated taps don't
+    // stack duplicate copies on the nav stack.
+    if (ModalRoute.of(context)?.settings.name == _notificationsRoute) return;
+    Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
-        builder: (_) => const DeficiencyAlertsScreen(),
+        settings: const RouteSettings(name: _notificationsRoute),
+        builder: (_) => const NotificationsScreen(),
       ),
     );
   }
