@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../core/no_transition_route.dart';
 import '../models/scan_result.dart';
 import '../services/scan_service.dart';
-import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
 import 'deficiency_alerts_screen.dart';
 import 'fertilizer_recommendations_screen.dart';
@@ -354,8 +353,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-
-      bottomNavigationBar: const AppBottomNav(current: AppTab.home),
     );
   }
 

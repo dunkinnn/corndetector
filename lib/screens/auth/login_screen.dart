@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/colors.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/brand_text_field.dart';
-import '../home_screen.dart';
+import '../root_tab_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
@@ -108,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const RootTabScreen()),
         (route) => false,
       );
     } on AuthException catch (e) {

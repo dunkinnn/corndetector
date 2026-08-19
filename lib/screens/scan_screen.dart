@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models/scan_result.dart';
 import '../services/scan_service.dart';
-import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
 import 'scan/camera_capture_screen.dart';
 
@@ -151,7 +150,13 @@ const List<_ScanOutcome> _mockOutcomes = [
 ];
 
 class ScanScreen extends StatefulWidget {
-  const ScanScreen({super.key});
+  const ScanScreen({super.key, this.onRegisterLeaveGuard});
+
+  // Called once this screen mounts, with a function the tab shell can call
+  // before switching away from Scan to warn about an unsaved result - and
+  // again with null on dispose. Only the shell's AppBottomNav needs this;
+  // the back-gesture guard below is handled locally via PopScope.
+  final void Function(Future<bool> Function()? guard)? onRegisterLeaveGuard;
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -175,6 +180,12 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Timer? _analysisTimer;
   int _analysisMessageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.onRegisterLeaveGuard?.call(_confirmLeaveIfUnsaved);
+  }
 
   // Lets the user choose whether to take a new photo or upload an existing one.
   Future<void> _showImageSourceSheet() async {
@@ -397,6 +408,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   void dispose() {
+    widget.onRegisterLeaveGuard?.call(null);
     _analysisTimer?.cancel();
     // Only clean up if the result was never saved - once _saveResult has
     // uploaded the photo, the local temp copy is left alone.
@@ -406,8 +418,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Blocks leaving (back gesture) while there's an unsaved result -
-    // bottom nav taps and the center FAB are guarded separately below.
+    // Blocks leaving (back gesture) while there's an unsaved result - the
+    // tab shell guards bottom nav taps separately via onRegisterLeaveGuard.
     return PopScope(
       canPop: !_hasUnsavedResult,
       onPopInvokedWithResult: (didPop, result) async {
@@ -444,11 +456,6 @@ class _ScanScreenState extends State<ScanScreen> {
               const SizedBox(height: 110), // Space to avoid bottom bar overlap
             ],
           ),
-        ),
-
-        bottomNavigationBar: AppBottomNav(
-          current: AppTab.scan,
-          onBeforeLeave: _confirmLeaveIfUnsaved,
         ),
       ),
     );

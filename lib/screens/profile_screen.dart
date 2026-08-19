@@ -5,7 +5,6 @@ import '../core/no_transition_route.dart';
 import '../models/user_profile.dart';
 import '../services/auth_service.dart';
 import '../services/profile_service.dart';
-import '../widgets/app_bottom_nav.dart';
 import '../widgets/app_top_bar.dart';
 import 'auth/login_screen.dart';
 import 'change_password_screen.dart';
@@ -151,8 +150,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-
-      bottomNavigationBar: const AppBottomNav(current: AppTab.profile),
     );
   }
 

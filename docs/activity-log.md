@@ -1,5 +1,41 @@
 # Activity Log
 
+## 2026-08-19: Persistent tab shell (fixes reload-on-every-tab-switch)
+
+- User reported the app "always refreshes" when switching screens - root
+  cause: Home, Scan, and Profile were each their own `Scaffold`, and
+  `AppBottomNav` switched between them with `Navigator.pushReplacement`,
+  destroying and rebuilding the target screen every time. Since each one
+  fetches its data in `initState` (`ScanService.getHistory()`,
+  `ProfileService.getCurrentProfile()`, etc.), every tab switch re-ran that
+  fetch and showed a loading spinner again.
+- Added `lib/screens/root_tab_screen.dart` (`RootTabScreen`): single
+  `Scaffold` hosting Home/Scan/Profile in an `IndexedStack`, with the one
+  shared `AppBottomNav` now switching the visible index instead of
+  navigating. All three tabs are built once and stay mounted, so their
+  state and already-fetched data survive tab switches; only a real refresh
+  (e.g. pull-to-refresh, or first mount) triggers a fetch.
+- `lib/widgets/app_bottom_nav.dart`: reworked from building/pushing a page
+  per tab to a `required ValueChanged<AppTab> onTabSelected` callback the
+  shell uses to change the stack index. No longer imports the three screens
+  or `noTransitionRoute`.
+- `home_screen.dart` / `profile_screen.dart` / `scan_screen.dart`: removed
+  their own `bottomNavigationBar: AppBottomNav(...)` - the shell now owns
+  the single shared bottom bar. Each screen keeps its own nested `Scaffold`
+  for its `AppTopBar`/background, which is a normal pattern for tabs nested
+  inside a parent Scaffold.
+- `scan_screen.dart`: added `onRegisterLeaveGuard`, called in `initState`
+  with `_confirmLeaveIfUnsaved` (and again with `null` in `dispose`), so
+  `RootTabScreen` can still warn about an unsaved scan result before
+  switching away from the Scan tab - same protection as before, just
+  relocated since Scan no longer owns the bottom nav that used to gate it.
+  The existing `PopScope` back-gesture guard on the same unsaved state was
+  untouched.
+- `app.dart`, `login_screen.dart`, `signup_screen.dart`: now route to
+  `RootTabScreen` instead of `HomeScreen` after a session check / successful
+  login / successful signup, since `HomeScreen` alone no longer renders a
+  bottom nav on its own.
+
 ## 2026-08-12: Center scan button redesigned to sit flush in the navbar notch
 
 - User reported the camera FAB looked like it was "floating"/loose instead

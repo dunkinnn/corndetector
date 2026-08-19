@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 
-import '../core/no_transition_route.dart';
-import '../screens/home_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/scan_screen.dart';
-
 // Which peer tab is currently showing, so it can be highlighted.
 enum AppTab { home, scan, profile, none }
 
-// Bottom bar shared by every top-level screen. Home, Scan, and Profile are
-// peer tabs, so they replace each other.
+// Bottom bar shared by the tab shell (see root_tab_screen.dart). Home, Scan,
+// and Profile are peer tabs living in one IndexedStack, so switching tabs
+// only changes which one is visible - it never rebuilds or refetches them.
 class AppBottomNav extends StatelessWidget {
-  const AppBottomNav({super.key, required this.current, this.onBeforeLeave});
+  const AppBottomNav({
+    super.key,
+    required this.current,
+    required this.onTabSelected,
+    this.onBeforeLeave,
+  });
 
   final AppTab current;
+
+  // Switches the visible tab. Called after onBeforeLeave allows it.
+  final ValueChanged<AppTab> onTabSelected;
 
   // Called before switching tabs; return false to cancel the navigation
   // (e.g. to warn about an unsaved scan result). Defaults to always allowing.
@@ -21,8 +25,14 @@ class AppBottomNav extends StatelessWidget {
 
   static const Color _primaryColor = Color(0xFF2E7D32);
 
+  static const double _barHeight = 96;
+
   @override
   Widget build(BuildContext context) {
+    // Reserve space for the home indicator / gesture bar so labels never sit
+    // flush against it; the white background still bleeds to the true edge.
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -39,49 +49,44 @@ class AppBottomNav extends StatelessWidget {
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         child: BottomAppBar(
-          shape: const CircularNotchedRectangle(),
-          notchMargin: 10.0,
           clipBehavior: Clip.antiAlias,
           color: Colors.white,
           elevation: 0,
+          padding: EdgeInsets.zero,
           child: SizedBox(
-            height: 96,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Center(
+            height: _barHeight + bottomInset,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
                     child: _buildNavItem(
                       icon: Icons.home_rounded,
                       label: 'Home',
                       selected: current == AppTab.home,
-                      onTap: () =>
-                          _goTo(context, const HomeScreen(), AppTab.home),
+                      onTap: () => _goTo(AppTab.home),
                     ),
                   ),
-                ),
-                SizedBox(
-                  width: 84,
-                  child: Center(
-                    child: _buildCameraItem(
-                      selected: current == AppTab.scan,
-                      onTap: () =>
-                          _goTo(context, const ScanScreen(), AppTab.scan),
+                  SizedBox(
+                    width: 84,
+                    child: Center(
+                      child: _buildCameraItem(
+                        selected: current == AppTab.scan,
+                        onTap: () => _goTo(AppTab.scan),
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Center(
+                  Expanded(
                     child: _buildNavItem(
                       icon: Icons.person_rounded,
                       label: 'Profile',
                       selected: current == AppTab.profile,
-                      onTap: () =>
-                          _goTo(context, const ProfileScreen(), AppTab.profile),
+                      onTap: () => _goTo(AppTab.profile),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -89,12 +94,11 @@ class AppBottomNav extends StatelessWidget {
     );
   }
 
-  // Skips navigation when the tab is already showing.
-  Future<void> _goTo(BuildContext context, Widget page, AppTab tab) async {
+  // Skips switching when the tab is already showing.
+  Future<void> _goTo(AppTab tab) async {
     if (current == tab) return;
     if (onBeforeLeave != null && !await onBeforeLeave!()) return;
-    if (!context.mounted) return;
-    Navigator.pushReplacement(context, noTransitionRoute(page));
+    onTabSelected(tab);
   }
 
   Widget _buildNavItem({
@@ -103,16 +107,20 @@ class AppBottomNav extends StatelessWidget {
     required bool selected,
     required VoidCallback onTap,
   }) {
-    final inactiveColor = Colors.grey.shade400;
+    // shade600 clears WCAG AA contrast against white; shade400 didn't.
+    final inactiveColor = Colors.grey.shade600;
 
     return InkWell(
+      // Fills the full Expanded cell (via the Row's stretch above), and
+      // InkWell hit-tests its whole bounds by default - no extra config
+      // needed for the tap area to cover more than the icon/label.
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(

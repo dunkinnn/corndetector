@@ -5,7 +5,7 @@ import '../../core/colors.dart';
 import '../../core/validators.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/brand_text_field.dart';
-import '../home_screen.dart';
+import '../root_tab_screen.dart';
 
 /// Sign up screen: branded header, live password strength checklist,
 /// confirm-password hint, and a Terms/Privacy consent checkbox.
@@ -198,7 +198,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (signedIn) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const RootTabScreen()),
           (route) => false,
         );
       } else {
