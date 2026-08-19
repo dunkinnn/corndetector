@@ -9,7 +9,6 @@ import 'deficiency_alerts_screen.dart';
 import 'fertilizer_recommendations_screen.dart';
 import 'nutrient_guide_screen.dart';
 import 'scan_history_screen.dart';
-import 'scan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -349,13 +348,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 110), // Space to avoid bottom bar overlap
           ],
         ),
-      ),
-
-      // --- Centre Scan Button ---
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppScanButton(
-        onPressed: () =>
-            Navigator.push(context, noTransitionRoute(const ScanScreen())),
       ),
 
       bottomNavigationBar: const AppBottomNav(current: AppTab.home),

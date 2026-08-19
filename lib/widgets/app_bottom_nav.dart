@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import '../core/no_transition_route.dart';
 import '../screens/home_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/scan_screen.dart';
 
 // Which peer tab is currently showing, so it can be highlighted.
-enum AppTab { home, profile, none }
+enum AppTab { home, scan, profile, none }
 
-// Bottom bar shared by every top-level screen, with a notch for the scan
-// button. Home and Profile are peer tabs, so they replace each other.
+// Bottom bar shared by every top-level screen. Home, Scan, and Profile are
+// peer tabs, so they replace each other.
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({super.key, required this.current, this.onBeforeLeave});
 
@@ -44,7 +45,7 @@ class AppBottomNav extends StatelessWidget {
           color: Colors.white,
           elevation: 0,
           child: SizedBox(
-            height: 76,
+            height: 88,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -54,10 +55,10 @@ class AppBottomNav extends StatelessWidget {
                   selected: current == AppTab.home,
                   onTap: () => _goTo(context, const HomeScreen(), AppTab.home),
                 ),
-
-                // Spacer for the center scan button.
-                const SizedBox(width: 64),
-
+                _buildCameraItem(
+                  selected: current == AppTab.scan,
+                  onTap: () => _goTo(context, const ScanScreen(), AppTab.scan),
+                ),
                 _buildNavItem(
                   icon: Icons.person_rounded,
                   label: 'Profile',
@@ -119,49 +120,38 @@ class AppBottomNav extends StatelessWidget {
       ),
     );
   }
-}
 
-// Centre scan button that docks into the bottom bar notch. A white ring
-// (matching the bar's own surface color) seats it flush into the notch
-// instead of the old oversized translucent halo, which read as a loose
-// floating circle rather than a button anchored to the bar.
-class AppScanButton extends StatelessWidget {
-  const AppScanButton({super.key, required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  static const Color _primaryColor = Color(0xFF2E7D32);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 68,
-      width: 68,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+  Widget _buildCameraItem({
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(36),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+        child: Transform.translate(
+          offset: const Offset(0, -10),
+          child: Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: _primaryColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _primaryColor.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.camera_alt_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
           ),
-        ],
-      ),
-      child: FloatingActionButton(
-        // Every screen has its own instance of this button; without an
-        // explicit tag they'd all share Flutter's default hero tag, which
-        // makes it flight-animate (visible as a twitch) between screens.
-        heroTag: null,
-        onPressed: onPressed,
-        backgroundColor: _primaryColor,
-        elevation: 1,
-        shape: const CircleBorder(),
-        child: const Icon(
-          Icons.camera_alt_rounded,
-          size: 26,
-          color: Colors.white,
         ),
       ),
     );

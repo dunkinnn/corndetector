@@ -338,13 +338,11 @@ class _ScanScreenState extends State<ScanScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, _LeaveAction.cancel),
+            onPressed: () => Navigator.pop(dialogContext, _LeaveAction.cancel),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, _LeaveAction.discard),
+            onPressed: () => Navigator.pop(dialogContext, _LeaveAction.discard),
             child: const Text('Discard'),
           ),
           ElevatedButton(
@@ -428,18 +426,13 @@ class _ScanScreenState extends State<ScanScreen> {
         ),
         body: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20.0,
-            vertical: 8.0,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
                 height:
-                    MediaQuery.of(context).padding.top +
-                    AppTopBar.height +
-                    20,
+                    MediaQuery.of(context).padding.top + AppTopBar.height + 20,
               ),
               _buildStepIndicator(),
               const SizedBox(height: 24),
@@ -453,21 +446,8 @@ class _ScanScreenState extends State<ScanScreen> {
           ),
         ),
 
-        // --- Centre Scan Button ---
-        floatingActionButtonLocation:
-            FloatingActionButtonLocation.centerDocked,
-        floatingActionButton: AppScanButton(
-          onPressed: () async {
-            if (_step == _ScanStep.capture) {
-              _showImageSourceSheet();
-            } else if (await _confirmLeaveIfUnsaved()) {
-              _reset();
-            }
-          },
-        ),
-
         bottomNavigationBar: AppBottomNav(
-          current: AppTab.none,
+          current: AppTab.scan,
           onBeforeLeave: _confirmLeaveIfUnsaved,
         ),
       ),
@@ -1008,11 +988,7 @@ class _ScanScreenState extends State<ScanScreen> {
           const SizedBox(height: 12),
           Text(
             outcome.symptom,
-            style: const TextStyle(
-              fontSize: 13,
-              color: _darkText,
-              height: 1.4,
-            ),
+            style: const TextStyle(fontSize: 13, color: _darkText, height: 1.4),
           ),
         ],
       ),
@@ -1064,16 +1040,8 @@ class _ScanScreenState extends State<ScanScreen> {
             'Fertilizer',
             rec.fertilizer,
           ),
-          _buildRecommendationRow(
-            Icons.straighten_rounded,
-            'Rate',
-            rec.rate,
-          ),
-          _buildRecommendationRow(
-            Icons.schedule_rounded,
-            'Timing',
-            rec.timing,
-          ),
+          _buildRecommendationRow(Icons.straighten_rounded, 'Rate', rec.rate),
+          _buildRecommendationRow(Icons.schedule_rounded, 'Timing', rec.timing),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
@@ -1383,5 +1351,4 @@ class _ScanScreenState extends State<ScanScreen> {
       ),
     );
   }
-
 }

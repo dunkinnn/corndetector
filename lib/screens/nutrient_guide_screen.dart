@@ -178,8 +178,9 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
   Color _getNutrientColor(String label) {
     final lower = label.toLowerCase();
     if (lower.contains('nitrogen')) return const Color(0xFF16A34A); // Green
-    if (lower.contains('phosphorus'))
+    if (lower.contains('phosphorus')) {
       return const Color(0xFFEA580C); // Orange/Red
+    }
     if (lower.contains('potassium')) return const Color(0xFF2563EB); // Blue
     if (lower.contains('healthy')) return const Color(0xFF059669); // Emerald
     return _primaryColor;

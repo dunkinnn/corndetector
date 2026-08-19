@@ -10,7 +10,6 @@ import '../widgets/app_top_bar.dart';
 import 'auth/login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'help_about_screen.dart';
-import 'scan_screen.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -145,12 +144,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
 
-      // --- Bottom Navigation Integration ---
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: AppScanButton(
-        onPressed: () =>
-            Navigator.push(context, noTransitionRoute(const ScanScreen())),
-      ),
       bottomNavigationBar: const AppBottomNav(current: AppTab.profile),
     );
   }
