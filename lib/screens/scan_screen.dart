@@ -574,58 +574,59 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
           ),
         ),
-        const SizedBox(height: 20),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _buildTipCard(
-                title: 'Best Practices',
-                icon: Icons.check_circle_rounded,
-                color: _primaryColor,
-                tips: const [
-                  'Take photo in good light',
-                  'Focus on middle leaves',
-                  'Fill frame with leaf',
-                ],
+        const SizedBox(height: 18),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.tips_and_updates_rounded,
+                  color: _primaryColor,
+                  size: 20,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildTipCard(
-                title: 'Avoid',
-                icon: Icons.warning_amber_rounded,
-                color: const Color(0xFFE65100),
-                tips: const [
-                  'Blurry or out-of-focus',
-                  'Dark shadows or rain',
-                  'Far away shots',
-                ],
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Quick tip',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _darkText,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Use a clear close-up of one leaf in natural light. Fill most of the frame so the model can read the color and edges.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _darkText,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Supported Classes',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: _darkText,
+            ],
           ),
         ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildDetectChip('N Nitrogen', _primaryColor),
-            _buildDetectChip('P Phosphorus', const Color(0xFF0284C7)),
-            _buildDetectChip('K Potassium', const Color(0xFFE65100)),
-            _buildDetectChip('Healthy Leaf', _primaryColor),
-          ],
-        ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
           height: 54,
@@ -636,7 +637,7 @@ class _ScanScreenState extends State<ScanScreen> {
               disabledBackgroundColor: Colors.grey.shade200,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(18),
               ),
               elevation: 0,
             ),
@@ -644,6 +645,14 @@ class _ScanScreenState extends State<ScanScreen> {
               'Detect & Classify',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Center(
+          child: Text(
+            'Nitrogen, phosphorus, potassium, and healthy leaf',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
         ),
       ],
@@ -1205,51 +1214,6 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  Widget _buildTipCard({
-    required String title,
-    required IconData icon,
-    required Color color,
-    required List<String> tips,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: _darkText,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...tips.map(
-            (tip) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '• $tip',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // Draws a detection box + label chip directly over the photo, positioned
   // as fractions of the container so it scales with any display size.
   Widget _buildBoundingBoxOverlay(DetectionBox box, Color color, String label) {
@@ -1296,25 +1260,6 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetectChip(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: color,
         ),
       ),
     );

@@ -45,26 +45,41 @@ class AppBottomNav extends StatelessWidget {
           color: Colors.white,
           elevation: 0,
           child: SizedBox(
-            height: 88,
+            height: 96,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                _buildNavItem(
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                  selected: current == AppTab.home,
-                  onTap: () => _goTo(context, const HomeScreen(), AppTab.home),
+                Expanded(
+                  child: Center(
+                    child: _buildNavItem(
+                      icon: Icons.home_rounded,
+                      label: 'Home',
+                      selected: current == AppTab.home,
+                      onTap: () =>
+                          _goTo(context, const HomeScreen(), AppTab.home),
+                    ),
+                  ),
                 ),
-                _buildCameraItem(
-                  selected: current == AppTab.scan,
-                  onTap: () => _goTo(context, const ScanScreen(), AppTab.scan),
+                SizedBox(
+                  width: 84,
+                  child: Center(
+                    child: _buildCameraItem(
+                      selected: current == AppTab.scan,
+                      onTap: () =>
+                          _goTo(context, const ScanScreen(), AppTab.scan),
+                    ),
+                  ),
                 ),
-                _buildNavItem(
-                  icon: Icons.person_rounded,
-                  label: 'Profile',
-                  selected: current == AppTab.profile,
-                  onTap: () =>
-                      _goTo(context, const ProfileScreen(), AppTab.profile),
+                Expanded(
+                  child: Center(
+                    child: _buildNavItem(
+                      icon: Icons.person_rounded,
+                      label: 'Profile',
+                      selected: current == AppTab.profile,
+                      onTap: () =>
+                          _goTo(context, const ProfileScreen(), AppTab.profile),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -94,7 +109,7 @@ class AppBottomNav extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
         child: FittedBox(
           fit: BoxFit.scaleDown,
           child: Column(
@@ -103,13 +118,13 @@ class AppBottomNav extends StatelessWidget {
               Icon(
                 icon,
                 color: selected ? _primaryColor : inactiveColor,
-                size: 32,
+                size: 26,
               ),
               const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 11,
                   fontWeight: selected ? FontWeight.bold : FontWeight.w600,
                   color: selected ? _primaryColor : inactiveColor,
                 ),
@@ -129,28 +144,25 @@ class AppBottomNav extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(36),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-        child: Transform.translate(
-          offset: const Offset(0, -10),
-          child: Container(
-            width: 68,
-            height: 68,
-            decoration: BoxDecoration(
-              color: _primaryColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: _primaryColor.withValues(alpha: 0.28),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.camera_alt_rounded,
-              color: Colors.white,
-              size: 30,
-            ),
+        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+        child: Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: _primaryColor,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: _primaryColor.withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.camera_alt_rounded,
+            color: Colors.white,
+            size: 30,
           ),
         ),
       ),
