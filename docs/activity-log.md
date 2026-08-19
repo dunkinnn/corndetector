@@ -1,5 +1,22 @@
 # Activity Log
 
+## 2026-08-19: Disabled mock detection - real model comes later
+
+- User asked to remove "automatic detect" since the real AI model will be
+  wired in separately later; the current detection was always a mock
+  (random pick + simulated delay, per the existing TODO on `_analyze`).
+- `scan_screen.dart`: the "Detect & Classify" button on the capture step is
+  now permanently disabled (`onPressed: null`) instead of running
+  `_analyze`'s mock random-pick logic, with its caption changed to
+  "Detection coming soon - the AI model isn't wired up yet". Capture/upload
+  (camera + gallery) is untouched and still fully works.
+- Left `_analyze`, `_pickMockOutcomes`, `_mockOutcomes`, and the
+  analysis/result step UI in place rather than deleting them - the plan is
+  to swap `_analyze`'s internals for a real model call and re-wire the
+  button's `onPressed` back to it, reusing this flow instead of rebuilding
+  it. `_analyze` is currently unused (expect an `unused_element` lint until
+  it's re-wired).
+
 ## 2026-08-19: Persistent tab shell (fixes reload-on-every-tab-switch)
 
 - User reported the app "always refreshes" when switching screens - root
