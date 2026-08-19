@@ -25,7 +25,7 @@ class AppBottomNav extends StatelessWidget {
 
   static const Color _primaryColor = Color(0xFF2E7D32);
 
-  static const double _barHeight = 96;
+  static const double _barHeight = 112;
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +69,7 @@ class AppBottomNav extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-                    width: 84,
+                    width: 92,
                     child: Center(
                       child: _buildCameraItem(
                         selected: current == AppTab.scan,
@@ -126,13 +126,13 @@ class AppBottomNav extends StatelessWidget {
               Icon(
                 icon,
                 color: selected ? _primaryColor : inactiveColor,
-                size: 26,
+                size: 28,
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 5),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: selected ? FontWeight.bold : FontWeight.w600,
                   color: selected ? _primaryColor : inactiveColor,
                 ),
@@ -150,12 +150,12 @@ class AppBottomNav extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(36),
+      borderRadius: BorderRadius.circular(40),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
         child: Container(
-          width: 72,
-          height: 72,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
             color: _primaryColor,
             shape: BoxShape.circle,
@@ -170,7 +170,7 @@ class AppBottomNav extends StatelessWidget {
           child: const Icon(
             Icons.camera_alt_rounded,
             color: Colors.white,
-            size: 30,
+            size: 32,
           ),
         ),
       ),

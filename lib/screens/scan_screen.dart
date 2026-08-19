@@ -280,10 +280,12 @@ class _ScanScreenState extends State<ScanScreen> {
     return deficiencies.take(count).toList();
   }
 
-  // Currently unused - the "Detect & Classify" button is disabled until a
-  // real model replaces this. TODO: swap this simulated delay + random pick
-  // for a real on-device or API-based nutrient-deficiency detection model,
-  // then re-wire the button's onPressed back to this.
+  // Intentionally unused for now - the "Detect & Classify" button is
+  // disabled until a real model replaces this. TODO: swap this simulated
+  // delay + random pick for a real on-device or API-based
+  // nutrient-deficiency detection model, then re-wire the button's
+  // onPressed back to this.
+  // ignore: unused_element
   Future<void> _analyze() async {
     if (_image == null) return;
     // Picked upfront (not after the delay) so the bounding boxes are
@@ -426,9 +428,9 @@ class _ScanScreenState extends State<ScanScreen> {
       canPop: !_hasUnsavedResult,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (await _confirmLeaveIfUnsaved() && mounted) {
-          Navigator.of(context).pop();
-        }
+        final canLeave = await _confirmLeaveIfUnsaved();
+        if (!mounted) return;
+        if (canLeave) Navigator.of(context).pop();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAF8),
