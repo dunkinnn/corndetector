@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon (API 26+): the OS masks this into whatever shape the
+     device/launcher uses (circle, squircle, rounded square, etc.) instead
+     of a fixed corner radius baked into a PNG - see mipmap-*/ic_launcher_
+     foreground.png for the logo layer, kept within Android's safe zone so
+     it isn't clipped by the mask. Older devices fall back to the plain
+     square mipmap-*/ic_launcher.png. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>

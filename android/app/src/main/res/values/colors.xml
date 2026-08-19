@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive icon background layer - plain white, matching the flat
+         legacy launcher icon and the in-app logo's white backdrop. -->
+    <color name="ic_launcher_background">#FFFFFFFF</color>
+</resources>

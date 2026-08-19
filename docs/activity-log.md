@@ -1,5 +1,64 @@
 # Activity Log
 
+## 2026-08-19: Android adaptive icon (proper rounded-icon support)
+
+- User asked to add a corner radius to the app launcher icon. Baking a
+  fixed radius into the PNG itself isn't the right approach on either
+  platform: iOS already masks app icons into its own rounded/squircle
+  shape automatically at display time (Apple's guidelines say submit a
+  full-bleed square with no rounding, transparency, or shadow of your own
+  - adding one causes double-rounded corners), so the square icons from
+  the previous entry are left untouched. Android has no such built-in
+  masking for legacy single-layer icons - the fix there is a proper
+  Adaptive Icon, which is what this entry adds.
+- Added `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`: an
+  `<adaptive-icon>` with a solid white `background` layer and a
+  `foreground` layer for the logo. On Android 8.0+ this lets the OS/
+  launcher apply whatever mask shape it uses (circle, squircle, rounded
+  square, etc.) instead of a corner radius fixed in the art - this is what
+  actually makes the icon look "rounded" and consistent with every other
+  app on the device's launcher. Devices below API 26 fall back to the
+  plain square `mipmap-*/ic_launcher.png` from the previous entry.
+- Added `android/app/src/main/res/values/colors.xml` with
+  `ic_launcher_background` (white, matching the flat icon's backdrop).
+- Generated `mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher_
+  foreground.png`: same cropped logo artwork as the flat icon, but scaled
+  by its diagonal (not just width/height, since the plant+roots shape
+  isn't square) so it stays inside Android's 66dp "safe zone" circle -
+  verified by compositing onto a simulated circle mask before generating
+  the final sizes, since a naive width/height-based scale left the leaf
+  tip, root base, and "K" badge poking past the safe zone and getting
+  clipped under an aggressive circular mask.
+
+## 2026-08-19: App launcher icon and display name (MaisNutri)
+
+- User asked to implement the app logo and the "MaisNutri" name at the
+  platform level - previously only `AppTopBar`'s in-app wordmark used the
+  brand; the actual home-screen icon and label were still Flutter/project
+  defaults ("corn_detection" / "Corn Detection", generic Flutter icon).
+- Generated all launcher icon sizes from `assets/images/logo.png` (which is
+  transparent-background artwork) by cropping to its content bounds,
+  compositing it centered with padding onto an opaque white square, then
+  resizing per platform - avoids the black-icon issue Apple's icon compiler
+  causes on PNGs with an alpha channel, and keeps the mark legible at small
+  sizes. Replaced in place (same filenames, no Contents.json/manifest
+  structure changes needed):
+  - `android/app/src/main/res/mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png`
+  - `ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-*.png` (all 15
+    sizes, including the 1024x1024 App Store icon).
+- `android/app/src/main/AndroidManifest.xml`: `android:label` "corn_detection"
+  -> "MaisNutri" (the name shown under the icon on the home screen and in
+  the app switcher).
+- `ios/Runner/Info.plist`: `CFBundleDisplayName` "Corn Detection" ->
+  "MaisNutri" (left `CFBundleName` as the internal bundle identifier,
+  unchanged).
+- `lib/app.dart`: `MaterialApp.title` "Corn Leaf Nutrient Detector" ->
+  "MaisNutri", for consistency with the above.
+- Not done: Android adaptive icons (foreground/background layers for the
+  themed/monochrome icon Android 13+ supports) - these are still simple
+  legacy square PNGs. Can add later if it looks inconsistent next to
+  adaptive-icon apps on a real device.
+
 ## 2026-08-19: Disabled mock detection - real model comes later
 
 - User asked to remove "automatic detect" since the real AI model will be

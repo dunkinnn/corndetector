@@ -15,7 +15,7 @@ class App extends StatelessWidget {
     final isSignedIn = supabase.auth.currentSession != null;
 
     return MaterialApp(
-      title: 'Corn Leaf Nutrient Detector',
+      title: 'MaisNutri',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.brandGreen),
