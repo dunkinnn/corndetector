@@ -282,8 +282,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 8),
 
                 const Text(
-                  'Scan corn leaves. Detect deficiencies.\n'
-                  'Grow healthier crops.',
+                  'Detect & classify nutrient deficiencies.\n'
+                  'Grow healthier corn.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

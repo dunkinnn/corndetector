@@ -449,14 +449,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: () async {
-              await const AuthService().signOut();
-              if (!dialogContext.mounted) return;
-              Navigator.pushAndRemoveUntil(
-                dialogContext,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close the confirmation modal.
+              _performSignOut(context);
             },
             child: const Text(
               'Sign Out',
@@ -468,6 +463,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // Shows a bare spinner (no dialog card/modal chrome around it) while
+  // signing out, then swaps to Login. Kept separate from the confirmation
+  // modal above so the loading state isn't shown inside that dialog.
+  Future<void> _performSignOut(BuildContext context) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      // No barrierColor override - same default dim (Colors.black54) as the
+      // confirmation modal above, so the backdrop looks consistent between
+      // the two instead of going lighter for the spinner.
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator(color: _primaryColor)),
+    );
+    // Supabase's signOut() often resolves in a few ms, which can pop the
+    // spinner before its push animation even finishes - so it never reads
+    // as "loading," just a flicker. Wait for whichever takes longer so it
+    // always shows for a beat.
+    final minDelay = Future<void>.delayed(const Duration(milliseconds: 500));
+    try {
+      await Future.wait([const AuthService().signOut(), minDelay]);
+    } catch (_) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // Dismiss spinner.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not sign out. Try again.')),
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(); // Dismiss spinner.
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
     );
   }
 }
