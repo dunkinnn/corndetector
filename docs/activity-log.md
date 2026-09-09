@@ -1,5 +1,21 @@
 # Activity Log
 
+## 2026-08-22: Re-enabled Detect & Classify
+
+- Scan screen's "Detect & Classify" button was disabled (`onPressed: null`)
+  earlier since no real detection model was wired up. User asked to have
+  the app detect, classify, and show a result again.
+- No real ML model exists yet, so this re-enables the existing mock
+  pipeline that was already fully built (analysis step, bounding boxes,
+  classification card, fertilizer recommendation, save-to-history) -
+  `_analyze` was already implemented, only unreachable. Re-wired
+  `onPressed` to `_analyze` (enabled once a photo is picked), removed the
+  `// ignore: unused_element` marker and the "Detection coming soon" caption
+  under the button.
+- `_analyze`'s TODO comment kept in place: swap the simulated delay +
+  random mock outcome for a real on-device or API-based nutrient-deficiency
+  model when one exists.
+
 ## 2026-08-20: Login/signup tagline copy
 
 - Updated the tagline under the "MaisNutri" wordmark on both

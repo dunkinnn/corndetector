@@ -280,12 +280,8 @@ class _ScanScreenState extends State<ScanScreen> {
     return deficiencies.take(count).toList();
   }
 
-  // Intentionally unused for now - the "Detect & Classify" button is
-  // disabled until a real model replaces this. TODO: swap this simulated
-  // delay + random pick for a real on-device or API-based
-  // nutrient-deficiency detection model, then re-wire the button's
-  // onPressed back to this.
-  // ignore: unused_element
+  // TODO: swap this simulated delay + random pick for a real on-device or
+  // API-based nutrient-deficiency detection model.
   Future<void> _analyze() async {
     if (_image == null) return;
     // Picked upfront (not after the delay) so the bounding boxes are
@@ -641,10 +637,8 @@ class _ScanScreenState extends State<ScanScreen> {
         SizedBox(
           width: double.infinity,
           height: 54,
-          // Disabled until a real detection model is wired into _analyze -
-          // see the TODO there. Capture/upload above still works normally.
           child: ElevatedButton(
-            onPressed: null,
+            onPressed: _image == null ? null : _analyze,
             style: ElevatedButton.styleFrom(
               backgroundColor: _primaryColor,
               disabledBackgroundColor: Colors.grey.shade200,
@@ -658,14 +652,6 @@ class _ScanScreenState extends State<ScanScreen> {
               'Detect & Classify',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Center(
-          child: Text(
-            'Detection coming soon - the AI model isn\'t wired up yet',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
           ),
         ),
       ],
@@ -1063,7 +1049,6 @@ class _ScanScreenState extends State<ScanScreen> {
             rec.fertilizer,
           ),
           _buildRecommendationRow(Icons.straighten_rounded, 'Rate', rec.rate),
-          _buildRecommendationRow(Icons.schedule_rounded, 'Timing', rec.timing),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),

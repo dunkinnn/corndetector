@@ -1,15 +1,6 @@
--- Migration: split single-detection `scans` rows into `scans` (photo-level)
--- + `scan_detections` (one row per detected region), so a photo with more
--- than one leaf/symptom area can hold more than one classification.
---
--- Run ONCE in your existing project's SQL Editor (Supabase dashboard >
--- SQL Editor > New query > Run). Safe to run twice - the backfill and
--- column drop are both skipped automatically if already applied.
--- Existing scan rows are preserved: each one becomes a scan with exactly
--- one detection carrying its old label/confidence/etc (box_* left null,
--- since no detection had a location before this change).
 
--- 1. Create scan_detections (same shape as in schema.sql).
+
+-- 1. Scan_detections (same shape as in schema.sql).
 create table if not exists public.scan_detections (
   id uuid primary key default gen_random_uuid(),
   scan_id uuid not null references public.scans (id) on delete cascade,
@@ -48,9 +39,7 @@ create policy "Users can delete own scan detections"
   on public.scan_detections for delete
   using (auth.uid() = user_id);
 
--- 2. Backfill one scan_detections row per existing scans row, then drop the
--- now-redundant columns from scans. Guarded on `scans.label` still
--- existing, so re-running this file after it's already applied is a no-op.
+-- 2. Backfill one scan_detections row per existing scans row
 do $$
 begin
   if exists (

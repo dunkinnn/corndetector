@@ -1,9 +1,3 @@
--- Corn Leaf Nutrient Deficiency Detection: Supabase schema.
--- Run this once in your project's SQL Editor (Supabase dashboard > SQL Editor > New query > Run).
--- For an existing project that already has the old single-detection `scans`
--- table, run supabase/migrations/002_multi_detection_scans.sql instead -
--- this file is the fresh-install target schema.
-
 -- 1. Profiles: one row per auth user, holds display name.
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -44,9 +38,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- 2. Scans: one row per leaf photo. A photo can contain more than one leaf
--- or symptom area, so the actual classification results live in
--- scan_detections below (one scan has one or more detections).
+-- 2. Scans: one row per leaf photo. 
 create table if not exists public.scans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -72,9 +64,6 @@ create policy "Users can delete own scans"
   using (auth.uid() = user_id);
 
 -- 3. Scan detections: one row per detected region within a scan's photo.
--- user_id is denormalized from the parent scan so RLS here doesn't need a
--- join. box_* columns are the detection's location as fractions (0.0-1.0)
--- of the photo and are nullable since not every detection is localized.
 create table if not exists public.scan_detections (
   id uuid primary key default gen_random_uuid(),
   scan_id uuid not null references public.scans (id) on delete cascade,
@@ -111,7 +100,6 @@ create policy "Users can delete own scan detections"
   using (auth.uid() = user_id);
 
 -- 4. Deficiency reference data: symptom and fertilizer guidance per label.
--- Readable by any signed-in user; edited only via the SQL editor (no client writes).
 create table if not exists public.deficiency_reference (
   label text primary key,
   symptom text not null,
