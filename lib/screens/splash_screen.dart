@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../core/app_info.dart';
 import '../core/colors.dart';
 import '../core/supabase_config.dart';
+import '../widgets/brand_wordmark.dart';
 import 'auth/login_screen.dart';
 import 'root_tab_screen.dart';
 
@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -59,18 +59,11 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              AppInfo.name,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: AppColors.brandGreen,
-              ),
-            ),
+            const BrandWordmark(fontSize: 32),
             const SizedBox(height: 6),
             Text(
               'Detect. Classify. Grow better.',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
             ),
             const SizedBox(height: 48),
             const SizedBox(

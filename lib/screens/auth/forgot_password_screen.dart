@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/validators.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/circle_back_button.dart';
 
 /// Password reset request screen; sends a Supabase reset email.
 class ForgotPasswordScreen extends StatefulWidget {
@@ -47,7 +48,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reset Password')),
+      appBar: AppBar(
+        title: const Text('Reset Password'),
+        leadingWidth: 64,
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 12),
+          child: CircleBackButton(),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

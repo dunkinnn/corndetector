@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/colors.dart';
 import '../core/validators.dart';
 import '../services/auth_service.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/brand_text_field.dart';
+import '../widgets/page_heading.dart';
+import '../widgets/primary_button.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -14,9 +17,6 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  static const Color _primaryColor = Color(0xFF2E7D32);
-  static const Color _darkText = Color(0xFF1E293B);
-
   final AuthService _auth = const AuthService();
 
   final _currentController = TextEditingController();
@@ -87,96 +87,59 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF8),
       extendBodyBehindAppBar: true,
-      appBar: const AppTopBar(
-        title: 'Change Password',
-        description: 'Update your account password',
-        showProfile: false,
-        showBack: true,
-      ),
-
-      body: SingleChildScrollView(
+      appBar: const AppTopBar(showProfile: false, showBack: true),
+      body: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height:
-                  MediaQuery.of(context).padding.top + AppTopBar.height + 20,
-            ),
-
-            _buildLabel('Current Password'),
-            BrandTextField(
-              hint: 'Enter your current password',
-              controller: _currentController,
-              isPassword: true,
-              obscureText: _obscureCurrent,
-              error: _currentError,
-              onToggleObscure: () =>
-                  setState(() => _obscureCurrent = !_obscureCurrent),
-              onChanged: () => setState(() => _currentError = null),
-            ),
-            const SizedBox(height: 18),
-
-            _buildLabel('New Password'),
-            BrandTextField(
-              hint: 'At least 8 characters',
-              controller: _newController,
-              isPassword: true,
-              obscureText: _obscureNew,
-              error: _newError,
-              onToggleObscure: () => setState(() => _obscureNew = !_obscureNew),
-              onChanged: () => setState(() => _newError = null),
-            ),
-            const SizedBox(height: 18),
-
-            _buildLabel('Confirm New Password'),
-            BrandTextField(
-              hint: 'Re-enter your new password',
-              controller: _confirmController,
-              isPassword: true,
-              obscureText: _obscureConfirm,
-              error: _confirmError,
-              onToggleObscure: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-              onChanged: () => setState(() => _confirmError = null),
-            ),
-            const SizedBox(height: 28),
-
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Update Password',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-              ),
-            ),
-
-            const SizedBox(height: 40),
-          ],
+        padding: EdgeInsets.fromLTRB(
+          20,
+          MediaQuery.of(context).padding.top + AppTopBar.height + 8,
+          20,
+          32,
         ),
+        children: [
+          const PageHeading(kicker: 'Security', title: 'Change password'),
+          _buildLabel('Current password'),
+          BrandTextField(
+            hint: 'Enter your current password',
+            controller: _currentController,
+            isPassword: true,
+            obscureText: _obscureCurrent,
+            error: _currentError,
+            onToggleObscure: () =>
+                setState(() => _obscureCurrent = !_obscureCurrent),
+            onChanged: () => setState(() => _currentError = null),
+          ),
+          const SizedBox(height: 18),
+          _buildLabel('New password'),
+          BrandTextField(
+            hint: 'At least 8 characters',
+            controller: _newController,
+            isPassword: true,
+            obscureText: _obscureNew,
+            error: _newError,
+            onToggleObscure: () => setState(() => _obscureNew = !_obscureNew),
+            onChanged: () => setState(() => _newError = null),
+          ),
+          const SizedBox(height: 18),
+          _buildLabel('Confirm new password'),
+          BrandTextField(
+            hint: 'Re-enter your new password',
+            controller: _confirmController,
+            isPassword: true,
+            obscureText: _obscureConfirm,
+            error: _confirmError,
+            onToggleObscure: () =>
+                setState(() => _obscureConfirm = !_obscureConfirm),
+            onChanged: () => setState(() => _confirmError = null),
+          ),
+          const SizedBox(height: 28),
+          PrimaryButton(
+            label: 'Update password',
+            onPressed: _submit,
+            isLoading: _isSaving,
+          ),
+        ],
       ),
     );
   }
@@ -189,7 +152,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         style: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: _darkText,
+          color: AppColors.textDark,
         ),
       ),
     );

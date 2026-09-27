@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../core/supabase_config.dart';
 import '../models/scan_result.dart';
 
@@ -11,6 +13,9 @@ class ScanService {
   const ScanService();
 
   static const _bucket = 'scan-photos';
+
+  // Bumped after every save so screens showing history can reload.
+  static final ValueNotifier<int> changes = ValueNotifier(0);
 
   Future<ScanResult> saveScan({
     required List<Detection> detections,
@@ -47,6 +52,7 @@ class ScanService {
         ])
         .select();
 
+    changes.value++;
     return ScanResult.fromMap({...scanRow, 'scan_detections': detectionRows});
   }
 

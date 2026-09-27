@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/colors.dart';
+
 // Placeholder shown on screens that have no stored data yet.
 class EmptyState extends StatelessWidget {
   const EmptyState({
@@ -13,55 +15,46 @@ class EmptyState extends StatelessWidget {
   final String title;
   final String message;
 
-  static const Color _primaryColor = Color(0xFF2E7D32);
-  static const Color _darkText = Color(0xFF1E293B);
-
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _primaryColor.withValues(alpha: 0.08),
+            decoration: const BoxDecoration(
+              color: AppColors.background,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 32, color: _primaryColor),
+            child: Icon(icon, size: 30, color: AppColors.textDark),
           ),
           const SizedBox(height: 16),
           Text(
             title,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: _darkText,
+              fontFamily: AppFonts.display,
+              fontSize: 19,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDark,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
-              color: Colors.grey.shade600,
-              height: 1.4,
+              color: AppColors.textMuted,
+              height: 1.45,
             ),
           ),
         ],

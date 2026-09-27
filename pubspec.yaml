@@ -53,6 +53,12 @@ dependencies:
   # Backend: auth, database, and storage for profiles, scans, and reference data.
   supabase_flutter: ^2.17.1
 
+  # On-device inference for the YOLOv8 leaf detector and EfficientNet-B0 classifier.
+  tflite_flutter: ^0.11.0
+
+  # Photo decoding, cropping, and resizing before inference.
+  image: ^4.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -76,6 +82,28 @@ flutter:
 
   assets:
     - assets/images/logo.png
+    - assets/models/
+
+  # Brand typefaces: Bricolage Grotesque for headings, Inter for body text.
+  fonts:
+    - family: Bricolage
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/BricolageGrotesque-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BricolageGrotesque-ExtraBold.ttf
+          weight: 800
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

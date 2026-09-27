@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../core/colors.dart';
 import '../models/scan_result.dart';
 import '../services/scan_service.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/detection_alert_card.dart';
 import '../widgets/empty_state.dart';
 
 // One non-healthy detection plus the date of the scan it came from - a scan
@@ -24,9 +26,6 @@ class DeficiencyAlertsScreen extends StatefulWidget {
 }
 
 class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
-  static const Color _darkText = Color(0xFF1E293B);
-  static const Color _alertColor = Color(0xFFDC2626);
-
   late final Future<List<_AlertItem>> _alertsFuture;
 
   @override
@@ -45,7 +44,7 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF8),
+      backgroundColor: AppColors.background,
       extendBodyBehindAppBar: true,
       appBar: const AppTopBar(
         title: 'Deficiency Alerts',
@@ -71,7 +70,7 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
                   return const Padding(
                     padding: EdgeInsets.symmetric(vertical: 40),
                     child: Center(
-                      child: CircularProgressIndicator(color: _alertColor),
+                      child: CircularProgressIndicator(color: AppColors.primary),
                     ),
                   );
                 }
@@ -96,54 +95,9 @@ class _DeficiencyAlertsScreenState extends State<DeficiencyAlertsScreen> {
   }
 
   Widget _buildAlertCard(_AlertItem item) {
-    final detection = item.detection;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _alertColor.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: _alertColor, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  detection.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: _alertColor,
-                  ),
-                ),
-              ),
-              Text(
-                '${(detection.confidence * 100).round()}%',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _alertColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            detection.symptom,
-            style: const TextStyle(fontSize: 13, color: _darkText, height: 1.4),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _formatDate(item.scanDate),
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
+    return DetectionAlertCard(
+      detection: item.detection,
+      scanDate: item.scanDate,
     );
   }
-
-  String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
 }

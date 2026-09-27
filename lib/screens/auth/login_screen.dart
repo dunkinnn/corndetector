@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/colors.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/brand_text_field.dart';
+import '../../widgets/brand_wordmark.dart';
 import '../root_tab_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
@@ -129,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SingleChildScrollView(
         child: Container(
           height: MediaQuery.of(context).size.height,
@@ -150,14 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 10),
 
-              const Text(
-                'MaisNutri',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.brandGreen,
-                ),
-              ),
+              const BrandWordmark(fontSize: 32),
 
               const SizedBox(height: 8),
 

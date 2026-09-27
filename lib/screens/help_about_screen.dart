@@ -1,145 +1,145 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_info.dart';
+import '../core/colors.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/brand_wordmark.dart';
+import '../widgets/page_heading.dart';
 
 class HelpAboutScreen extends StatelessWidget {
   const HelpAboutScreen({super.key});
 
-  static const Color _primaryColor = Color(0xFF2E7D32);
-  static const Color _darkText = Color(0xFF1E293B);
+  static const List<String> _scanSteps = [
+    'Take the photo in good natural light.',
+    'Focus on the middle leaves of the plant.',
+    'Fill the frame with a single leaf.',
+    'Avoid blurry shots, deep shadows and wet leaves.',
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF8),
       extendBodyBehindAppBar: true,
-      appBar: const AppTopBar(
-        title: 'Help & About',
-        description: 'App information and support',
-        showProfile: false,
-        showBack: true,
-      ),
-
-      body: SingleChildScrollView(
+      appBar: const AppTopBar(showProfile: false, showBack: true),
+      body: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height:
-                  MediaQuery.of(context).padding.top + AppTopBar.height + 20,
+        padding: EdgeInsets.fromLTRB(
+          20,
+          MediaQuery.of(context).padding.top + AppTopBar.height + 8,
+          20,
+          32,
+        ),
+        children: [
+          const PageHeading(kicker: 'Support', title: 'Help & about'),
+          _buildCard(
+            child: Row(
+              children: [
+                Image.asset('assets/images/logo.png', height: 56),
+                const SizedBox(width: 12),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    BrandWordmark(fontSize: 22),
+                    SizedBox(height: 2),
+                    Text(
+                      'Version ${AppInfo.version}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-
-            // --- App Identity ---
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _primaryColor.withValues(alpha: 0.08),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.eco_rounded,
-                      size: 36,
-                      color: _primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    AppInfo.name,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: _darkText,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Version ${AppInfo.version}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
-
-            _buildSectionTitle('About'),
-            _buildCard(
+          ),
+          const SectionTitle('About'),
+          _buildCard(
+            child: const Text(
               'MaisNutri detects and classifies nutrient deficiencies in corn '
               'leaves from a photo, then suggests a fertilizer based on the '
               'deficiency it identifies.',
+              style: _bodyStyle,
             ),
-            const SizedBox(height: 20),
-
-            _buildSectionTitle('How to Scan'),
-            _buildCard(
-              'Take the photo in good natural light, focus on the middle '
-              'leaves, and fill the frame with a single leaf. Avoid blurry '
-              'shots, deep shadows, and wet leaves.',
+          ),
+          const SectionTitle('How to scan'),
+          _buildCard(
+            child: Column(
+              children: [
+                for (var i = 0; i < _scanSteps.length; i++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: i == _scanSteps.length - 1 ? 0 : 12,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: AppColors.corn,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${i + 1}',
+                            style: const TextStyle(
+                              fontFamily: AppFonts.display,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(_scanSteps[i], style: _bodyStyle),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 20),
-
-            _buildSectionTitle('Disclaimer'),
-            _buildCard(
+          ),
+          const SectionTitle('Disclaimer'),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.corn.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Text(
               'Detections and fertilizer recommendations are generated by an '
               'automated model and are intended to support, not replace, '
               'professional agricultural advice.',
+              style: _bodyStyle,
             ),
-
-            const SizedBox(height: 40),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSectionTitle(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: _darkText,
-          letterSpacing: -0.3,
-        ),
-      ),
-    );
-  }
+  static const TextStyle _bodyStyle = TextStyle(
+    fontSize: 14,
+    height: 1.5,
+    color: AppColors.textDark,
+  );
 
-  Widget _buildCard(String body) {
+  Widget _buildCard({required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey.shade100),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.card,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: Text(
-        body,
-        style: TextStyle(
-          fontSize: 13,
-          color: Colors.grey.shade700,
-          height: 1.5,
-        ),
-      ),
+      child: child,
     );
   }
 }

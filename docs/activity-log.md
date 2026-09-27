@@ -1,5 +1,120 @@
 # Activity Log
 
+## 2026-09-27: Circular back button
+
+- New `lib/widgets/circle_back_button.dart`: fixed 44px circle, hairline
+  border, back arrow. Centered so the AppBar `leading` slot's tight
+  constraints can't stretch it into a pill (the old IconButton did).
+- Used in `AppTopBar` (Settings, Edit profile, Change password, Help,
+  Notifications, Nutrient guide, Fertilizer, Alerts, Scan history), the scan
+  result photo header, and Forgot password (was the default plain arrow).
+
+## 2026-09-27: Scan failures showed a misleading "check your connection"
+
+- Tested both `.tflite` models offline with the app's exact preprocessing on
+  notebook sample leaves: YOLO finds the leaf (0.87-0.94) and EfficientNet
+  matches the notebook (e.g. Nitrogen 99%). Op versions are compatible with
+  tflite_flutter 0.11's runtime. So the models and pipeline math are fine.
+- `scan_screen.dart` caught every error with "Check your connection", hiding
+  the real cause. Now logs `[Scan] analyze failed: ...` with the stack trace,
+  shows a stage-specific message, and in debug builds shows the raw error.
+- `DetectionService` wraps each stage in `DetectionFailure` (loadModels /
+  referenceData / inference), no longer caches a failed model load forever,
+  logs `[Detection]` results, and reports a missing `deficiency_reference`
+  row instead of silently dropping the leaf (which made saveScan throw).
+- Backups of both files: `build/_claude_test/*.orig`. Not run through
+  `flutter analyze` (no Flutter SDK in this session).
+
+## 2026-09-27: Real on-device detection (YOLOv8 + EfficientNet-B0)
+
+- Replaced the mock in `lib/services/detection_service.dart` with the notebook
+  pipeline: YOLOv8 finds leaves, each crop is padded to 224x224 and classified
+  by EfficientNet-B0. Runs in a background isolate via `tflite_flutter`.
+- Added `tflite_flutter` and `image` dependencies and the `assets/models/`
+  folder; `isSample` is now false, so the sample notices are hidden.
+- Scan screen shows a retake message when no leaf is detected.
+- Leaf confidence threshold raised from the notebook's 0.25 to 0.45.
+- Model files are not in the repo yet; export steps in `docs/model-export.md`.
+- Not verified on device: no Flutter SDK in this session; run `flutter pub get`
+  and `flutter analyze` locally.
+
+## 2026-09-21: Latest scan photo not updating
+
+- Home reused the same `ScanPhoto` after a new scan, and its signed URL was
+  only fetched in `initState`, so the old photo stayed. Added
+  `didUpdateWidget` to refetch on a new `imagePath`, and keyed the Home
+  thumbnail by scan id.
+
+## 2026-09-21: Throttled Home and Profile refresh
+
+- Spamming pull-to-refresh fired a new Supabase request every time.
+- New `lib/core/throttled_loader.dart`: runs one load at a time and skips
+  repeats within 5 seconds. Home and Profile use it for initial load and
+  pull-to-refresh; a saved scan forces a reload past the cooldown.
+
+## 2026-09-21: Profile section redesigned
+
+- Profile: brand header, "Profile" page heading, dark hero card (corn avatar,
+  name, email, scan totals that reload on save), Account / Support lists,
+  separate red Sign out row; restyled sign-out dialog.
+- Edit profile, Change password, Settings, Help & about: back-only top bar,
+  page heading, shared list rows and dark primary button. Help has numbered
+  scan steps and a corn-tinted disclaimer.
+- New shared widgets: `PageHeading` + `SectionTitle` (page_heading.dart),
+  `ListGroup` + `ListRow` (list_group.dart), `PrimaryButton`. Home now uses
+  SectionTitle and ListGroup instead of its own copies.
+- `AppTopBar`: `showBack` without a title shows only a bordered back button.
+- `BrandTextField`: white fill, 14px radius, palette border (affects login
+  and signup too). `EmptyState` restyled.
+- Home title changed to "Welcome, Farmer"; summary bar fixed (Row needed
+  cross-axis stretch for childless ColoredBox segments).
+
+## 2026-09-21: Scan works end to end in sample mode
+
+- No trained model exists yet (`assets/models` empty; paper plans YOLOv8 +
+  EfficientNetB0 TFLite). User chose a clearly labeled sample mode so the
+  full flow can be demoed.
+- New `lib/services/detection_service.dart`: `DetectionService.detect(photo)`
+  returns detections built from the `deficiency_reference` table with
+  simulated labels, confidences and boxes. `isSample = true` drives every
+  "Sample" label; swap `detect` for TFLite inference and set it to false.
+- Scan tab: Detect & Classify now analyzes (overlay spinner), saves the scan
+  and photo via `ScanService`, then opens the result screen; returning
+  resets the tab. Coming-soon step removed.
+- `ScanService.changes` notifier bumps on save; Home listens and reloads.
+- Result screen shows a "Sample result" notice; Home latest card kicker
+  adds "SAMPLE". Sample scans are stored like real ones (no DB flag), so
+  clear them from history once the real model ships.
+
+## 2026-09-21: Visual redesign based on the logo
+
+- Client said the app looked plain; first pass (gold accents, gradients,
+  rainbow icon tiles) was rejected as generic. Replaced with a system built
+  from the logo: leaf green, corn yellow, soil navy, and the logo's N (blue),
+  P (orange), K (purple) dots as the color code for every result.
+- Mockup approved first: `maisnutri-redesign-mockup.png` (session output).
+- Fonts: bundled Bricolage Grotesque (headings) and Inter (body) as static
+  TTFs in `assets/fonts` with OFL licenses; registered in `pubspec.yaml`.
+- `core/colors.dart`: new palette, `AppColors.nutrient(label)` and
+  `nutrientLetter(label)` replace the per-screen `_getNutrientColor`
+  copies (which had N green, K blue - opposite of the logo). `AppFonts` added.
+- New widgets: `NutrientDot`, `ScanPhoto` (photo with NPK-colored detection
+  boxes), `DetectionAlertCard` (shared by Alerts and Notifications),
+  `BrandWordmark` (top bar, login, signup, splash).
+- Home rebuilt: dark latest-scan card with photo thumbnail, NPK summary of
+  the last 12 scans, plain tools list, first-scan card with a Scan button
+  (`HomeScreen.onScan` wired from `RootTabScreen`), pull to refresh.
+- Scan History detail rebuilt as the result view: full-width photo, sheet
+  with result, "What we see" and "What to apply" cards.
+- Bottom nav flat with hairline border; scan button corn yellow. Top bar
+  solid (no frosted glass). Soft drop shadows removed app-wide in favor of
+  hairline borders; grey shades mapped to palette tokens.
+- Scan tab restyled to match Home: brand header, "Step 1 of 2" heading,
+  dark viewfinder with corn-yellow corners, plain tip card, corn button.
+  Old capsule step indicator removed.
+- Not verified with `flutter analyze` (no Flutter SDK reachable from the
+  session) - run `flutter pub get` and `flutter analyze` before committing.
+
 ## 2026-08-22: Re-enabled Detect & Classify
 
 - Scan screen's "Detect & Classify" button was disabled (`onPressed: null`)

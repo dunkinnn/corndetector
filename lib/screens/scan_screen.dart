@@ -1,16 +1,20 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:image_picker/image_picker.dart';
 
+import '../core/colors.dart';
+import '../services/detection_service.dart';
+import '../services/scan_service.dart';
 import '../widgets/app_top_bar.dart';
 import 'scan/camera_capture_screen.dart';
+import 'scan_history_screen.dart';
 
-const Color _primaryColor = Color(0xFF2E7D32); // Modern Emerald Green
-const Color _darkText = Color(0xFF1E293B);
+const Color _darkText = AppColors.textDark;
 
-enum _ScanStep { capture, comingSoon }
+enum _ScanStep { capture, analyzing }
 
 // Which source the "Add a Leaf Photo" bottom sheet was tapped for.
 enum _ImageSource { camera, gallery }
@@ -54,7 +58,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ListTile(
               leading: const Icon(
                 Icons.photo_camera_rounded,
-                color: _primaryColor,
+                color: _darkText,
               ),
               title: const Text('Take Photo'),
               onTap: () => Navigator.pop(sheetContext, _ImageSource.camera),
@@ -62,7 +66,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ListTile(
               leading: const Icon(
                 Icons.photo_library_rounded,
-                color: _primaryColor,
+                color: _darkText,
               ),
               title: const Text('Upload from Gallery'),
               onTap: () => Navigator.pop(sheetContext, _ImageSource.gallery),
@@ -119,11 +123,55 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
-  // TODO: replace with a real on-device or API-based nutrient-deficiency
-  // detection model. Until then, capture just leads to a coming-soon notice.
-  void _analyze() {
-    if (_image == null) return;
-    setState(() => _step = _ScanStep.comingSoon);
+  // Runs detection, saves the scan, then opens its result screen.
+  Future<void> _analyze() async {
+    final image = _image;
+    if (image == null || _step == _ScanStep.analyzing) return;
+    setState(() => _step = _ScanStep.analyzing);
+    try {
+      final detections = await const DetectionService().detect(image);
+      final scan = await const ScanService().saveScan(
+        detections: detections,
+        photo: image,
+      );
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ScanHistoryDetailScreen(scan: scan)),
+      );
+      if (mounted) _reset();
+    } on NoLeafDetectedException {
+      if (!mounted) return;
+      setState(() => _step = _ScanStep.capture);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No corn leaf found. Retake the photo with the leaf filling the frame.',
+          ),
+        ),
+      );
+    } catch (e, st) {
+      // Log the real cause - the old catch-all hid model/inference errors
+      // behind a "check your connection" message.
+      debugPrint('[Scan] analyze failed: $e\n$st');
+      if (!mounted) return;
+      setState(() => _step = _ScanStep.capture);
+      final message = switch (e) {
+        DetectionFailure(stage: DetectionStage.loadModels) =>
+          'Could not load the detection model. Fully restart the app and try again.',
+        DetectionFailure(stage: DetectionStage.inference) =>
+          'Analysis failed on this photo. Try another photo.',
+        DetectionFailure(stage: DetectionStage.referenceData) =>
+          'Could not load nutrient reference data. Check your connection and try again.',
+        _ => 'Could not save this scan. Check your connection and try again.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(kDebugMode ? '$message\n\n$e' : message),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    }
   }
 
   void _reset() {
@@ -156,33 +204,43 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isCapture = _step == _ScanStep.capture;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF8),
       extendBodyBehindAppBar: true,
-      appBar: const AppTopBar(
-        title: 'Detect & Classify',
-        description: 'Identify the nutrient deficiency in a corn leaf',
-        showProfile: false,
-      ),
-      body: SingleChildScrollView(
+      appBar: const AppTopBar(),
+      body: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height:
-                  MediaQuery.of(context).padding.top + AppTopBar.height + 20,
-            ),
-            _buildStepIndicator(),
-            const SizedBox(height: 24),
-            switch (_step) {
-              _ScanStep.capture => _buildCaptureStep(),
-              _ScanStep.comingSoon => _buildComingSoonStep(),
-            },
-            const SizedBox(height: 110), // Space to avoid bottom bar overlap
-          ],
+        padding: EdgeInsets.fromLTRB(
+          20,
+          MediaQuery.of(context).padding.top + AppTopBar.height + 8,
+          20,
+          32,
         ),
+        children: [
+          Text(
+            isCapture ? 'STEP 1 OF 2 \u00B7 PHOTO' : 'STEP 2 OF 2 \u00B7 ANALYZING',
+            style: const TextStyle(
+              fontSize: 11,
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isCapture ? 'Photograph a leaf' : 'Analyzing leaf',
+            style: const TextStyle(
+              fontFamily: AppFonts.display,
+              fontSize: 30,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.8,
+              height: 1.1,
+              color: _darkText,
+            ),
+          ),
+          const SizedBox(height: 18),
+          _buildCaptureStep(),
+        ],
       ),
     );
   }
@@ -190,167 +248,57 @@ class _ScanScreenState extends State<ScanScreen> {
   // --- Step 1: Photo capture/upload ---
   Widget _buildCaptureStep() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GestureDetector(
-          onTap: _showImageSourceSheet,
-          child: Container(
-            width: double.infinity,
-            height: 360,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.grey.shade200),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        Material(
+          color: AppColors.primaryDark,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: _step == _ScanStep.analyzing ? null : _showImageSourceSheet,
+            child: SizedBox(
+              height: 340,
+              child: _image == null ? _buildViewfinder() : _buildPreview(),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: _image == null
-                ? Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Viewfinder corner marks
-                      Positioned(
-                        top: 16,
-                        left: 16,
-                        child: Icon(
-                          Icons.crop_free_rounded,
-                          size: 28,
-                          color: _primaryColor.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: Icon(
-                          Icons.crop_free_rounded,
-                          size: 28,
-                          color: _primaryColor.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 16,
-                        left: 16,
-                        child: Icon(
-                          Icons.crop_free_rounded,
-                          size: 28,
-                          color: _primaryColor.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 16,
-                        right: 16,
-                        child: Icon(
-                          Icons.crop_free_rounded,
-                          size: 28,
-                          color: _primaryColor.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: _primaryColor.withValues(alpha: 0.08),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt_rounded,
-                              size: 36,
-                              color: _primaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Add a Leaf Photo',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: _darkText,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Take a photo or upload one from your gallery',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
-                : Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // cacheWidth downsizes during decode so a full-res
-                      // camera photo doesn't get decoded at full size just
-                      // to render into this small preview box.
-                      Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
-                      Positioned(
-                        right: 12,
-                        top: 12,
-                        child: _buildPillButton(
-                          icon: Icons.refresh_rounded,
-                          label: 'Change Photo',
-                          onTap: _showImageSourceSheet,
-                        ),
-                      ),
-                    ],
-                  ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
         Container(
-          width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.card,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: AppColors.border),
           ),
-          child: Row(
+          child: const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.tips_and_updates_rounded,
-                  color: _primaryColor,
-                  size: 20,
-                ),
+              Icon(
+                Icons.lightbulb_outline_rounded,
+                color: _darkText,
+                size: 22,
               ),
-              const SizedBox(width: 12),
-              const Expanded(
+              SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Quick tip',
+                      'For a good photo',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                         color: _darkText,
                       ),
                     ),
                     SizedBox(height: 4),
                     Text(
-                      'Use a clear close-up of one leaf in natural light. Fill most of the frame so the model can read the color and edges.',
+                      'One leaf, natural light, filling most of the frame '
+                      'so its color and edges are clear.',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: _darkText,
-                        height: 1.4,
+                        fontSize: 13,
+                        height: 1.45,
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ],
@@ -359,204 +307,141 @@ class _ScanScreenState extends State<ScanScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         SizedBox(
-          width: double.infinity,
           height: 54,
-          child: ElevatedButton(
-            onPressed: _image == null ? null : _analyze,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor,
-              disabledBackgroundColor: Colors.grey.shade200,
-              foregroundColor: Colors.white,
+          child: FilledButton(
+            onPressed: _image == null || _step == _ScanStep.analyzing
+                ? null
+                : _analyze,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.corn,
+              foregroundColor: _darkText,
+              disabledBackgroundColor: AppColors.border,
+              disabledForegroundColor: AppColors.textMuted,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
               ),
-              elevation: 0,
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            child: const Text(
-              'Detect & Classify',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            child: Text(switch ((_image, _step)) {
+              (null, _) => 'Add a photo to continue',
+              (_, _ScanStep.analyzing) => 'Analyzing...',
+              _ => 'Detect & Classify',
+            }),
           ),
         ),
+        if (DetectionService.isSample)
+          const Padding(
+            padding: EdgeInsets.only(top: 10),
+            child: Text(
+              'Sample mode: results are simulated until the detection model '
+              'is trained.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ),
       ],
     );
   }
 
-  // --- Step 2: Coming soon notice, shown instead of a (fake) result ---
-  Widget _buildComingSoonStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  // Empty dark frame with corn-yellow corner marks and a scan prompt.
+  Widget _buildViewfinder() {
+    return Stack(
       children: [
-        if (_image != null)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: SizedBox(
-              height: 280,
-              width: double.infinity,
-              child: Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
+        for (final corner in const [
+          Alignment.topLeft,
+          Alignment.topRight,
+          Alignment.bottomLeft,
+          Alignment.bottomRight,
+        ])
+          Align(
+            alignment: corner,
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: _CornerMark(corner: corner),
             ),
           ),
-        const SizedBox(height: 20),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade100),
-          ),
+        Center(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.08),
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: AppColors.corn,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.science_rounded,
-                  color: _primaryColor,
-                  size: 32,
+                  Icons.photo_camera_outlined,
+                  size: 28,
+                  color: _darkText,
                 ),
               ),
               const SizedBox(height: 16),
               const Text(
-                'Detection Model Coming Soon',
-                textAlign: TextAlign.center,
+                'Tap to add a leaf photo',
                 style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: _darkText,
+                  fontFamily: AppFonts.display,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                "Your photo looks good. The nutrient-deficiency detection model isn't ready yet, so there's no result to show for it.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
+              const SizedBox(height: 4),
+              const Text(
+                'Take a photo or choose one from your gallery',
+                style: TextStyle(fontSize: 13, color: Color(0xFFCFE2D4)),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: OutlinedButton(
-            onPressed: _reset,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.grey.shade700,
-              side: BorderSide(color: Colors.grey.shade300),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: const Text(
-              'Scan Another Leaf',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
           ),
         ),
       ],
     );
   }
 
-  // --- Modern Animated Capsule Step Indicator ---
-  Widget _buildStepIndicator() {
-    const steps = ['Photo', 'Result'];
-    final currentIndex = _ScanStep.values.indexOf(_step);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: List.generate(steps.length * 2 - 1, (i) {
-          if (i.isOdd) {
-            final isPassed = currentIndex > i ~/ 2;
-            return Expanded(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: 2,
-                color: isPassed ? _primaryColor : Colors.grey.shade200,
+  Widget _buildPreview() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // cacheWidth downsizes during decode so a full-res photo stays cheap.
+        Image.file(_image!, fit: BoxFit.cover, cacheWidth: 800),
+        if (_step == _ScanStep.analyzing)
+          const ColoredBox(
+            color: Color(0x99123D27),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: AppColors.corn),
+                  SizedBox(height: 14),
+                  Text(
+                    'Checking for N, P and K deficiency',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
-            );
-          }
-          final index = i ~/ 2;
-          final isDone = index < currentIndex;
-          final isActive = index == currentIndex;
-
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? _primaryColor
-                  : (isDone
-                        ? _primaryColor.withValues(alpha: 0.1)
-                        : Colors.grey.shade100),
-              borderRadius: BorderRadius.circular(20),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? Colors.white
-                        : (isDone ? _primaryColor : Colors.grey.shade300),
-                    shape: BoxShape.circle,
-                  ),
-                  child: isDone
-                      ? const Icon(Icons.check, size: 12, color: Colors.white)
-                      : Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            color: isActive
-                                ? _primaryColor
-                                : Colors.grey.shade700,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
-                        ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  steps[index],
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isActive || isDone
-                        ? FontWeight.bold
-                        : FontWeight.w500,
-                    color: isActive
-                        ? Colors.white
-                        : (isDone ? _primaryColor : Colors.grey.shade500),
-                  ),
-                ),
-              ],
+          )
+        else
+          Positioned(
+            right: 12,
+            top: 12,
+            child: _buildPillButton(
+              icon: Icons.refresh_rounded,
+              label: 'Change photo',
+              onTap: _showImageSourceSheet,
             ),
-          );
-        }),
-      ),
+          ),
+      ],
     );
   }
 
@@ -587,6 +472,32 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// L-shaped viewfinder corner in corn yellow, oriented by its alignment.
+class _CornerMark extends StatelessWidget {
+  const _CornerMark({required this.corner});
+
+  final Alignment corner;
+
+  @override
+  Widget build(BuildContext context) {
+    const side = BorderSide(color: AppColors.corn, width: 3);
+    return SizedBox(
+      width: 26,
+      height: 26,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: corner.y < 0 ? side : BorderSide.none,
+            bottom: corner.y > 0 ? side : BorderSide.none,
+            left: corner.x < 0 ? side : BorderSide.none,
+            right: corner.x > 0 ? side : BorderSide.none,
+          ),
         ),
       ),
     );

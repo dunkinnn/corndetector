@@ -1,16 +1,18 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../core/colors.dart';
 import '../screens/notifications_screen.dart';
+import 'brand_wordmark.dart';
+import 'circle_back_button.dart';
 
-/// Frosted-glass header shared by the Home and Profile screens.
+/// Flat header shared by the Home and Profile screens.
 /// Pair with `Scaffold(extendBodyBehindAppBar: true, ...)` and add a
 /// `SizedBox(height: AppTopBar.height + MediaQuery.of(context).padding.top)`
 /// at the top of the scrollable body so content clears the transparent bar.
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   // Default (no args): brand header with logo + "MaisNutri" wordmark.
+  // With `showBack` and no title: just the back button, for pages that show
+  // their own PageHeading.
   // Pass `title` (and optionally `description`) for a centered text header
   // instead, e.g. the Profile screen.
   const AppTopBar({
@@ -29,8 +31,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showBack;
 
   static const double height = 70;
-  static const Color _darkBlue = Color(0xFF1E293B);
-  static const Color _textSecondary = Color(0xFF64748B);
+  static const Color _darkBlue = AppColors.textDark;
+  static const Color _textSecondary = AppColors.textMuted;
 
   @override
   Size get preferredSize => const Size.fromHeight(height);
@@ -44,33 +46,18 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       scrolledUnderElevation: 0,
       toolbarHeight: height,
+      leadingWidth: 64,
       centerTitle: hasCustomTitle,
       // Home and Profile are peer tabs, not a navigation stack.
       automaticallyImplyLeading: false,
       leading: showBack
-          ? IconButton(
-              onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(Icons.arrow_back_rounded, color: _darkBlue),
+          ? const Padding(
+              padding: EdgeInsets.only(left: 12),
+              child: CircleBackButton(),
             )
           : null,
-      // Frosted glass: blur whatever scrolls beneath, tinted white so dark
-      // text stays legible, with a hairline edge to separate it from content.
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.72),
-              border: Border(
-                bottom: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  width: 1,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+      // Solid paper color so scrolled content never shows through.
+      flexibleSpace: Container(color: AppColors.background),
       title: hasCustomTitle
           ? Column(
               mainAxisSize: MainAxisSize.min,
@@ -78,8 +65,10 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                 Text(
                   title!,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontFamily: AppFonts.display,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
                     color: _darkBlue,
                   ),
                 ),
@@ -94,6 +83,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
               ],
             )
+          : showBack
+          ? null
           : Row(
               children: [
                 Image.asset(
@@ -102,40 +93,25 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                   errorBuilder: (context, error, stackTrace) =>
                       const Icon(Icons.eco, color: AppColors.brandGreen),
                 ),
-                const SizedBox(width: 10),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'MAIS',
-                      style: TextStyle(
-                        color: AppColors.brandGreen,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    Text(
-                      'NUTRI',
-                      style: TextStyle(
-                        color: _darkBlue,
-                        fontSize: 10,
-                        letterSpacing: 3.0,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(width: 8),
+                const BrandWordmark(),
               ],
             ),
       actions: [
-        IconButton(
-          onPressed: () => _openNotifications(context),
-          tooltip: 'Notifications',
-          icon: const Icon(
-            Icons.notifications_none_rounded,
-            color: _textSecondary,
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: IconButton(
+            onPressed: () => _openNotifications(context),
+            tooltip: 'Notifications',
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.card,
+              side: const BorderSide(color: AppColors.border),
+            ),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              color: _darkBlue,
+              size: 22,
+            ),
           ),
         ),
       ],

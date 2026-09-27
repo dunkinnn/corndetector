@@ -14,8 +14,22 @@ class App extends StatelessWidget {
       title: 'MaisNutri',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.brandGreen),
         useMaterial3: true,
+        fontFamily: AppFonts.body,
+        scaffoldBackgroundColor: AppColors.background,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          primary: AppColors.primary,
+          secondary: AppColors.corn,
+          surface: AppColors.card,
+          onSurface: AppColors.textDark,
+          error: AppColors.errorRed,
+        ),
+        dividerColor: AppColors.border,
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: AppColors.textDark,
+          behavior: SnackBarBehavior.floating,
+        ),
       ),
       home: const SplashScreen(),
     );

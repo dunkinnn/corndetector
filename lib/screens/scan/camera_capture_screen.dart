@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
-const Color _primaryColor = Color(0xFF2E7D32); // Matches scan_screen.dart.
+import '../../core/colors.dart';
+
+const Color _primaryColor = AppColors.primary; // Matches scan_screen.dart.
 
 // Full-screen live camera preview for capturing a leaf photo in-app,
 // instead of launching the system Camera app via image_picker. Keeping the

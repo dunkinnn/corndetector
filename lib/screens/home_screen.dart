@@ -1,558 +1,484 @@
 import 'package:flutter/material.dart';
 
+import '../core/colors.dart';
 import '../core/no_transition_route.dart';
+import '../core/throttled_loader.dart';
 import '../models/scan_result.dart';
+import '../services/detection_service.dart';
 import '../services/scan_service.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/list_group.dart';
+import '../widgets/nutrient_dot.dart';
+import '../widgets/page_heading.dart';
+import '../widgets/scan_photo.dart';
 import 'deficiency_alerts_screen.dart';
 import 'fertilizer_recommendations_screen.dart';
 import 'nutrient_guide_screen.dart';
 import 'scan_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onScan});
+
+  // Switches the tab shell to the Scan tab.
+  final VoidCallback? onScan;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// Shown wherever a metric has no real data source yet.
-const String _placeholder = '--';
-
 class _HomeScreenState extends State<HomeScreen> {
   // Home greets every signed-in user as "Farmer" rather than their real name.
   static const String _displayName = 'Farmer';
+
+  // How many recent scans the NPK summary covers.
+  static const int _summaryWindow = 12;
+  static const List<String> _summaryLabels = [
+    'Nitrogen Deficiency',
+    'Phosphorus Deficiency',
+    'Potassium Deficiency',
+    'Healthy',
+  ];
+  static const List<String> _weekdays = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+    'Sunday',
+  ];
+  static const List<String> _months = [
+    'January', 'February', 'March', 'April', 'May', 'June', 'July',
+    'August', 'September', 'October', 'November', 'December',
+  ];
+
   List<ScanResult> _scans = [];
+
+  // Guards against repeated pull-to-refresh firing a request each time.
+  late final ThrottledLoader _loader = ThrottledLoader(_loadDashboard);
 
   @override
   void initState() {
     super.initState();
-    _loadDashboard();
+    ScanService.changes.addListener(_onScansChanged);
+    _loader();
   }
+
+  @override
+  void dispose() {
+    ScanService.changes.removeListener(_onScansChanged);
+    super.dispose();
+  }
+
+  void _onScansChanged() => _loader(force: true);
 
   Future<void> _loadDashboard() async {
     final scans = await const ScanService().getHistory();
     if (!mounted) return;
-    setState(() {
-      _scans = scans;
-    });
+    setState(() => _scans = scans);
   }
 
-  // Most recent scan's representative result (worst-case detection if the
-  // scan found more than one region - see ScanResult.primaryDetection).
-  // "+N" is appended when there were other detections in that same scan.
-  String get _latestResult {
-    if (_scans.isEmpty) return _placeholder;
-    final scan = _scans.first;
-    final label = scan.primaryDetection.label;
-    final extra = scan.detections.length - 1;
-    return extra > 0 ? '$label +$extra' : label;
+  // Scan count per summary label, using each scan's representative result.
+  Map<String, int> get _summaryCounts {
+    final counts = {for (final label in _summaryLabels) label: 0};
+    for (final scan in _scans.take(_summaryWindow)) {
+      final label = scan.primaryDetection.label;
+      if (counts.containsKey(label)) counts[label] = counts[label]! + 1;
+    }
+    return counts;
   }
 
-  String get _latestConfidence => _scans.isEmpty
-      ? _placeholder
-      : '${(_scans.first.primaryDetection.confidence * 100).round()}%';
-  String get _latestScanDate =>
-      _scans.isEmpty ? _placeholder : _formatDate(_scans.first.createdAt);
+  int get _alertCount => [
+    for (final scan in _scans) ...scan.detections.where((d) => !d.isHealthy),
+  ].length;
 
-  int get _healthyCount => _scans.where((s) => s.isHealthy).length;
-  int get _deficientCount => _scans.where((s) => !s.isHealthy).length;
+  String get _today {
+    final now = DateTime.now();
+    return '${_weekdays[now.weekday - 1]}, ${_months[now.month - 1]} ${now.day}';
+  }
 
-  int get _totalScans => _healthyCount + _deficientCount;
-  bool get _hasScans => _totalScans > 0;
+  String _timeAgo(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${_months[date.month - 1].substring(0, 3)} ${date.day}';
+  }
 
-  String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
-
-  // Opens a quick action sub-screen on top of Home.
   void _open(Widget page) {
     Navigator.push(context, noTransitionRoute(page));
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF2E7D32); // Modern Emerald Green
-    const accentColor = Color(0xFF1B5E20);
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF8), // Soft off-white background
       extendBodyBehindAppBar: true,
       appBar: const AppTopBar(),
-
-      // --- Main Body ---
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _loader.call,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            MediaQuery.of(context).padding.top + AppTopBar.height + 8,
+            20,
+            32,
+          ),
           children: [
-            SizedBox(
-              height:
-                  MediaQuery.of(context).padding.top + AppTopBar.height + 16,
-            ),
-
-            // --- Welcome Header ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome,',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade600,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _displayName,
-                      style: const TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E293B),
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.eco_rounded,
-                    color: primaryColor,
-                    size: 24,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // --- Latest Detection Card ---
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: LinearGradient(
-                  colors: [primaryColor, accentColor],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryColor.withValues(alpha: 0.3),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: -20,
-                    top: -20,
-                    child: CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Latest Detection',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'Most Recent',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDetectionMetric(
-                                Icons.grass_rounded,
-                                _latestResult,
-                                'Result',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _buildDetectionMetric(
-                                Icons.percent_rounded,
-                                _latestConfidence,
-                                'Confidence',
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _buildDetectionMetric(
-                                Icons.schedule_rounded,
-                                _latestScanDate,
-                                'Last Scan',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            Text(
+              _today,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textMuted,
               ),
             ),
-            // --- Empty State ---
-            // Explains the placeholders before any scan has been recorded.
-            if (!_hasScans) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 16,
-                    color: Colors.grey.shade500,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'No scans yet. Tap the camera button to scan a corn leaf.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 28),
-
-            // --- Scan Summary Header ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Scan Summary',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                Text(
-                  _hasScans ? '$_totalScans total' : '',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // --- Scan Summary Cards ---
-            // Plain counts of past scans, so no aggregation rule is implied.
-            Row(
-              children: [
-                Expanded(
-                  child: _buildHealthCard(
-                    title: 'Healthy Scans',
-                    value: _hasScans ? '$_healthyCount' : _placeholder,
-                    color: primaryColor,
-                    progress: _hasScans ? _healthyCount / _totalScans : 0,
-                    icon: Icons.check_circle_rounded,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _buildHealthCard(
-                    title: 'Deficient Scans',
-                    value: _hasScans ? '$_deficientCount' : _placeholder,
-                    color: const Color(0xFFE65100),
-                    progress: _hasScans ? _deficientCount / _totalScans : 0,
-                    icon: Icons.warning_amber_rounded,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-
-            // --- Quick Actions Header ---
+            const SizedBox(height: 4),
             const Text(
-              'Quick Actions',
+              'Welcome, $_displayName',
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
-                letterSpacing: -0.3,
+                fontFamily: AppFonts.display,
+                fontSize: 30,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.8,
+                height: 1.1,
+                color: AppColors.textDark,
               ),
             ),
-            const SizedBox(height: 14),
-
-            // --- Action Cards ---
-            _buildActionCard(
-              icon: Icons.warning_amber_rounded,
-              title: 'Deficiency Alerts',
-              subtitle: 'Review detected N, P, K deficiencies',
-              onTap: () => _open(const DeficiencyAlertsScreen()),
-            ),
-            _buildActionCard(
-              icon: Icons.menu_book_rounded,
-              title: 'Nutrient Guide',
-              subtitle: 'Symptoms and causes of each deficiency',
-              onTap: () => _open(const NutrientGuideScreen()),
-            ),
-            _buildActionCard(
-              icon: Icons.science_rounded,
-              title: 'Fertilizer Recommendations',
-              subtitle: 'Suggested dosage and application timing',
-              onTap: () => _open(const FertilizerRecommendationsScreen()),
-            ),
-            _buildActionCard(
-              icon: Icons.history_rounded,
-              title: 'Scan History',
-              subtitle: 'Past leaf scans and deficiency results',
-              onTap: () => _open(const ScanHistoryScreen()),
-            ),
-
-            const SizedBox(height: 110), // Space to avoid bottom bar overlap
+            const SizedBox(height: 18),
+            _scans.isEmpty ? _buildFirstScanCard() : _buildLatestCard(),
+            if (_scans.isNotEmpty) ...[
+              SectionTitle(
+                'Last ${_scans.length.clamp(1, _summaryWindow)} scans',
+                action: 'View history',
+                onAction: () => _open(const ScanHistoryScreen()),
+              ),
+              _buildSummaryCard(),
+            ],
+            const SectionTitle('Tools'),
+            _buildToolsList(),
           ],
         ),
       ),
     );
   }
 
-  // Detection Metric Component for the latest detection card.
-  Widget _buildDetectionMetric(IconData icon, String value, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 18, color: Colors.white),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            maxLines: 1,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 9,
-              color: Colors.white70,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Dark hero card with the most recent scan and its top result.
+  Widget _buildLatestCard() {
+    final scan = _scans.first;
+    final detection = scan.primaryDetection;
+    final extra = scan.detections.length - 1;
+    final confidence = detection.confidence.clamp(0.0, 1.0).toDouble();
 
-  // Modern Health Card Component with Visual Progress Indicator
-  Widget _buildHealthCard({
-    required String title,
-    required String value,
-    required Color color,
-    required double progress,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Material(
+      color: AppColors.primaryDark,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _open(ScanHistoryDetailScreen(scan: scan)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 96,
+                  height: 118,
+                  child: ScanPhoto(key: ValueKey(scan.id), scan: scan),
                 ),
-                child: Icon(icon, color: color, size: 20),
               ),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: color,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'LATEST SCAN \u00B7 ${_timeAgo(scan.createdAt).toUpperCase()}'
+                      '${DetectionService.isSample ? ' \u00B7 SAMPLE' : ''}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 1.1,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF9FC3A8),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      detection.isHealthy ? 'Healthy leaf' : detection.label,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.display,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
+                        height: 1.1,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (extra > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          '+$extra more ${extra == 1 ? 'area' : 'areas'} found',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFCFE2D4),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        NutrientDot(label: detection.label),
+                        const SizedBox(width: 6),
+                        const Expanded(
+                          child: Text(
+                            'Confidence',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFCFE2D4),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${(confidence * 100).round()}%',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: confidence,
+                        minHeight: 6,
+                        backgroundColor: Colors.white.withValues(alpha: 0.14),
+                        valueColor: const AlwaysStoppedAnimation(
+                          AppColors.corn,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      detection.isHealthy
+                          ? 'View scan details \u2192'
+                          : 'See what to apply \u2192',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.corn,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF475569),
-            ),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: color.withValues(alpha: 0.12),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-              minHeight: 5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Modern Action Card Template
-  Widget _buildActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade100),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: const Color(0xFF2E7D32), size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
     );
   }
+
+  // Shown before any scan exists: explains the app and points to Scan.
+  Widget _buildFirstScanCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.primaryDark,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              NutrientDot(label: 'Nitrogen'),
+              SizedBox(width: 4),
+              NutrientDot(label: 'Phosphorus'),
+              SizedBox(width: 4),
+              NutrientDot(label: 'Potassium'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Scan your first leaf',
+            style: TextStyle(
+              fontFamily: AppFonts.display,
+              fontSize: 23,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Take a clear photo of one corn leaf to check it for nitrogen, '
+            'phosphorus or potassium deficiency.',
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.45,
+              color: Color(0xFFCFE2D4),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: widget.onScan,
+            icon: const Icon(Icons.photo_camera_outlined, size: 20),
+            label: const Text('Scan a leaf'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.corn,
+              foregroundColor: AppColors.textDark,
+              minimumSize: const Size(0, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Stacked NPK bar plus one count column per result type.
+  Widget _buildSummaryCard() {
+    final counts = _summaryCounts;
+    final nonZero = _summaryLabels.where((l) => counts[l]! > 0).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration,
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: SizedBox(
+              height: 10,
+              // Stretch so the childless ColoredBox segments fill the height.
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < nonZero.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 3),
+                    Expanded(
+                      flex: counts[nonZero[i]]!,
+                      child: ColoredBox(
+                        color: AppColors.nutrient(nonZero[i]),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                for (var i = 0; i < _summaryLabels.length; i++) ...[
+                  if (i > 0)
+                    const VerticalDivider(
+                      width: 20,
+                      thickness: 1,
+                      color: AppColors.border,
+                    ),
+                  Expanded(
+                    child: _buildSummaryColumn(
+                      _summaryLabels[i],
+                      counts[_summaryLabels[i]]!,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryColumn(String label, int count) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        NutrientDot(label: label, size: 28),
+        const SizedBox(height: 10),
+        Text(
+          '$count',
+          style: const TextStyle(
+            fontFamily: AppFonts.display,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+            height: 1,
+            color: AppColors.textDark,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label.replaceAll(' Deficiency', ''),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildToolsList() {
+    final alerts = _alertCount;
+    return ListGroup(
+      children: [
+        ListRow(
+          icon: Icons.warning_amber_rounded,
+          title: 'Deficiency alerts',
+          subtitle: 'Leaves that need attention',
+          trailing: alerts > 0 ? _buildBadge('$alerts') : null,
+          onTap: () => _open(const DeficiencyAlertsScreen()),
+        ),
+        ListRow(
+          icon: Icons.menu_book_outlined,
+          title: 'Nutrient guide',
+          subtitle: 'Symptoms of N, P and K deficiency',
+          onTap: () => _open(const NutrientGuideScreen()),
+        ),
+        ListRow(
+          icon: Icons.science_outlined,
+          title: 'Fertilizer guide',
+          subtitle: 'Recommended rates and timing',
+          onTap: () => _open(const FertilizerRecommendationsScreen()),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBadge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.phosphorus,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  static final BoxDecoration _cardDecoration = BoxDecoration(
+    color: AppColors.card,
+    borderRadius: BorderRadius.circular(22),
+    border: Border.all(color: AppColors.border),
+  );
 }

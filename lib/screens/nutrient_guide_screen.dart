@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../core/colors.dart';
 import '../models/deficiency_reference.dart';
 import '../services/reference_data_service.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/nutrient_dot.dart';
 
 class NutrientGuideScreen extends StatefulWidget {
   const NutrientGuideScreen({super.key});
@@ -13,10 +15,10 @@ class NutrientGuideScreen extends StatefulWidget {
 }
 
 class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
-  static const Color _primaryColor = Color(0xFF2E7D32);
-  static const Color _bgCanvas = Color(0xFFF4F6F4);
-  static const Color _textMain = Color(0xFF0F172A);
-  static const Color _textMuted = Color(0xFF64748B);
+  static const Color _primaryColor = AppColors.primary;
+  static const Color _bgCanvas = AppColors.background;
+  static const Color _textMain = AppColors.textDark;
+  static const Color _textMuted = AppColors.textMuted;
 
   late final Future<List<DeficiencyReference>> _guideFuture;
 
@@ -87,7 +89,7 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: const Text(
                     'No matching nutrient deficiency found.',
@@ -105,8 +107,6 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
 
   // --- Expandable Nutrient Card Component ---
   Widget _buildExpandableNutrientCard(DeficiencyReference entry) {
-    final themeColor = _getNutrientColor(entry.label);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       width: double.infinity,
@@ -114,7 +114,7 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -124,18 +124,7 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: Container(
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: themeColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.eco_rounded, color: themeColor, size: 20),
-                  ),
-                ),
+                NutrientDot(label: entry.label, size: 36),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -172,17 +161,5 @@ class _NutrientGuideScreenState extends State<NutrientGuideScreen> {
         ),
       ),
     );
-  }
-
-  // Utility to give distinctive visual identities to nutrients
-  Color _getNutrientColor(String label) {
-    final lower = label.toLowerCase();
-    if (lower.contains('nitrogen')) return const Color(0xFF16A34A); // Green
-    if (lower.contains('phosphorus')) {
-      return const Color(0xFFEA580C); // Orange/Red
-    }
-    if (lower.contains('potassium')) return const Color(0xFF2563EB); // Blue
-    if (lower.contains('healthy')) return const Color(0xFF059669); // Emerald
-    return _primaryColor;
   }
 }

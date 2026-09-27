@@ -53,3 +53,4 @@ node_modules/
 
 # Local scratch/cleanup folder
 _to_delete/
+_backup/

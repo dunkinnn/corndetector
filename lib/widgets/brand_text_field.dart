@@ -43,10 +43,12 @@ class BrandTextField extends StatelessWidget {
           onChanged: (_) => onChanged?.call(),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: Color(0xFFC1C7D0)),
+            hintStyle: const TextStyle(color: AppColors.textGrey),
+            filled: true,
+            fillColor: AppColors.card,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 15,
-              vertical: 12,
+              horizontal: 16,
+              vertical: 15,
             ),
             suffixIcon: isPassword && controller.text.isNotEmpty
                 ? IconButton(
@@ -58,16 +60,16 @@ class BrandTextField extends StatelessWidget {
                   )
                 : null,
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                color: hasError ? AppColors.errorRed : const Color(0xFFD1D5DB),
+                color: hasError ? AppColors.errorRed : AppColors.border,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                color: hasError ? AppColors.errorRed : AppColors.brandGreen,
-                width: 2,
+                color: hasError ? AppColors.errorRed : AppColors.textDark,
+                width: 1.5,
               ),
             ),
           ),

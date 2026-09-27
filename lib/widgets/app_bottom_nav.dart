@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/colors.dart';
+
 // Which peer tab is currently showing, so it can be highlighted.
 enum AppTab { home, scan, profile, none }
 
@@ -23,9 +25,7 @@ class AppBottomNav extends StatelessWidget {
   // (e.g. to warn about an unsaved scan result). Defaults to always allowing.
   final Future<bool> Function()? onBeforeLeave;
 
-  static const Color _primaryColor = Color(0xFF2E7D32);
-
-  static const double _barHeight = 86;
+  static const double _barHeight = 76;
 
   @override
   Widget build(BuildContext context) {
@@ -34,62 +34,41 @@ class AppBottomNav extends StatelessWidget {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: const Offset(0, -6),
-          ),
-        ],
+      height: _barHeight + bottomInset,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      decoration: const BoxDecoration(
+        color: AppColors.card,
+        border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: BottomAppBar(
-          clipBehavior: Clip.antiAlias,
-          color: Colors.white,
-          elevation: 0,
-          padding: EdgeInsets.zero,
-          child: SizedBox(
-            height: _barHeight + bottomInset,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: bottomInset),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _buildNavItem(
-                      icon: Icons.home_rounded,
-                      label: 'Home',
-                      selected: current == AppTab.home,
-                      onTap: () => _goTo(AppTab.home),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 80,
-                    child: Center(
-                      child: _buildCameraItem(
-                        selected: current == AppTab.scan,
-                        onTap: () => _goTo(AppTab.scan),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildNavItem(
-                      icon: Icons.person_rounded,
-                      label: 'Profile',
-                      selected: current == AppTab.profile,
-                      onTap: () => _goTo(AppTab.profile),
-                    ),
-                  ),
-                ],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _buildNavItem(
+              icon: Icons.home_rounded,
+              label: 'Home',
+              selected: current == AppTab.home,
+              onTap: () => _goTo(AppTab.home),
+            ),
+          ),
+          SizedBox(
+            width: 88,
+            child: Center(
+              child: _buildCameraItem(
+                selected: current == AppTab.scan,
+                onTap: () => _goTo(AppTab.scan),
               ),
             ),
           ),
-        ),
+          Expanded(
+            child: _buildNavItem(
+              icon: Icons.person_rounded,
+              label: 'Profile',
+              selected: current == AppTab.profile,
+              onTap: () => _goTo(AppTab.profile),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -107,8 +86,8 @@ class AppBottomNav extends StatelessWidget {
     required bool selected,
     required VoidCallback onTap,
   }) {
-    // shade600 clears WCAG AA contrast against white; shade400 didn't.
-    final inactiveColor = Colors.grey.shade600;
+    const inactiveColor = AppColors.textMuted;
+    const activeColor = AppColors.textDark;
 
     return InkWell(
       // Fills the full Expanded cell (via the Row's stretch above), and
@@ -125,16 +104,16 @@ class AppBottomNav extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: selected ? _primaryColor : inactiveColor,
-                size: 28,
+                color: selected ? activeColor : inactiveColor,
+                size: 26,
               ),
               const SizedBox(height: 5),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                  color: selected ? _primaryColor : inactiveColor,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? activeColor : inactiveColor,
                 ),
               ),
             ],
@@ -144,32 +123,28 @@ class AppBottomNav extends StatelessWidget {
     );
   }
 
+  // Corn-yellow scan button; turns dark while the Scan tab is open.
   Widget _buildCameraItem({
     required bool selected,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(32),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-        child: Container(
-          width: 64,
-          height: 64,
+    return Semantics(
+      button: true,
+      label: 'Scan a leaf',
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 58,
+          height: 58,
           decoration: BoxDecoration(
-            color: _primaryColor,
+            color: selected ? AppColors.textDark : AppColors.corn,
             shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: _primaryColor.withValues(alpha: 0.28),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
           ),
-          child: const Icon(
-            Icons.camera_alt_rounded,
-            color: Colors.white,
+          child: Icon(
+            Icons.photo_camera_outlined,
+            color: selected ? AppColors.corn : AppColors.textDark,
             size: 26,
           ),
         ),

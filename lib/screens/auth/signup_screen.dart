@@ -5,6 +5,7 @@ import '../../core/colors.dart';
 import '../../core/validators.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/brand_text_field.dart';
+import '../../widgets/brand_wordmark.dart';
 import '../root_tab_screen.dart';
 
 /// Sign up screen: branded header, live password strength checklist,
@@ -245,7 +246,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SingleChildScrollView(
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -270,14 +271,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
                 const SizedBox(height: 10),
 
-                const Text(
-                  'MaisNutri',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.brandGreen,
-                  ),
-                ),
+                const BrandWordmark(fontSize: 32),
 
                 const SizedBox(height: 8),
 

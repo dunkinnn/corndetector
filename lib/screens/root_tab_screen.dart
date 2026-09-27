@@ -42,7 +42,7 @@ class _RootTabScreenState extends State<RootTabScreen> {
       body: IndexedStack(
         index: _index,
         children: [
-          const HomeScreen(),
+          HomeScreen(onScan: () => _onTabSelected(AppTab.scan)),
           ScanScreen(
             onRegisterLeaveGuard: (guard) => _scanLeaveGuard = guard,
           ),

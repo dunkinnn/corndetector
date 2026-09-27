@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../core/colors.dart';
 import '../models/scan_result.dart';
+import '../services/detection_service.dart';
 import '../services/scan_service.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/circle_back_button.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/nutrient_dot.dart';
+import '../widgets/scan_photo.dart';
 
 class ScanHistoryScreen extends StatefulWidget {
   const ScanHistoryScreen({super.key});
@@ -13,9 +18,9 @@ class ScanHistoryScreen extends StatefulWidget {
 }
 
 class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
-  static const Color _primaryColor = Color(0xFF2E7D32);
-  static const Color _bgCanvas = Color(0xFFF4F6F4);
-  static const Color _textMuted = Color(0xFF64748B);
+  static const Color _primaryColor = AppColors.primary;
+  static const Color _bgCanvas = AppColors.background;
+  static const Color _textMuted = AppColors.textMuted;
 
   late final Future<List<ScanResult>> _historyFuture;
 
@@ -39,7 +44,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
 
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -78,94 +83,57 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
     );
   }
 
-  // A scan can hold more than one detection (photo had more than one leaf
-  // or symptom area), so the label/confidence pair from the old single-
-  // detection card is now one chip per detection instead of a fixed column.
+  // One row per scan: NPK dot for its top result, every detection's label
+  // and confidence, and the scan date.
   Widget _buildScanCard(ScanResult scan) {
-    final color = scan.isHealthy ? _primaryColor : const Color(0xFFDC2626);
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ScanHistoryDetailScreen(scan: scan),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        width: double.infinity,
-        constraints: const BoxConstraints(minHeight: 104),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+    final primary = scan.primaryDetection;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: AppColors.border),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  scan.isHealthy
-                      ? Icons.check_circle_rounded
-                      : Icons.warning_amber_rounded,
-                  color: color,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: scan.detections
-                          .map(_buildDetectionChip)
-                          .toList(),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _formatDate(scan.createdAt),
-                      style: const TextStyle(fontSize: 12, color: _textMuted),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(Icons.chevron_right_rounded, color: _textMuted),
-            ],
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ScanHistoryDetailScreen(scan: scan),
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetectionChip(Detection detection) {
-    final color = detection.isHealthy ? _primaryColor : const Color(0xFFDC2626);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '${detection.label} ${(detection.confidence * 100).round()}%',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: color,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                NutrientDot(label: primary.label, size: 34),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final d in scan.detections)
+                        Text(
+                          '${d.isHealthy ? 'Healthy' : d.label} '
+                          '\u00B7 ${(d.confidence * 100).round()}%',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatDate(scan.createdAt),
+                        style: const TextStyle(fontSize: 12, color: _textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: _textMuted),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -174,208 +142,306 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
   String _formatDate(DateTime date) => '${date.month}/${date.day}/${date.year}';
 }
 
+// Result view for one scan: photo with NPK boxes, then a sheet per detection.
 class ScanHistoryDetailScreen extends StatelessWidget {
   const ScanHistoryDetailScreen({super.key, required this.scan});
 
   final ScanResult scan;
 
-  static const Color _primaryColor = Color(0xFF2E7D32);
-  static const Color _bgCanvas = Color(0xFFF4F6F4);
-  static const Color _textMain = Color(0xFF0F172A);
-  static const Color _textMuted = Color(0xFF64748B);
+  static const double _photoHeight = 300;
+  static const List<String> _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  String get _dateTime {
+    final d = scan.createdAt.toLocal();
+    final hour = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final minute = d.minute.toString().padLeft(2, '0');
+    final period = d.hour < 12 ? 'AM' : 'PM';
+    return '${_months[d.month - 1]} ${d.day}, $hour:$minute $period';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    final primary = scan.primaryDetection;
+    final areas = scan.detections.length;
+
     return Scaffold(
-      backgroundColor: _bgCanvas,
-      extendBodyBehindAppBar: true,
-      appBar: AppTopBar(
-        title: 'Scan Details',
-        description: '${scan.detections.length} detections',
-        showProfile: false,
-        showBack: true,
-      ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
             SizedBox(
-              height:
-                  MediaQuery.of(context).padding.top + AppTopBar.height + 20,
+              height: _photoHeight + top,
+              width: double.infinity,
+              child: ScanPhoto(scan: scan, showLabels: true),
             ),
-            if (scan.imagePath != null) ...[
-              FutureBuilder<String>(
-                future: const ScanService().photoUrl(scan.imagePath!),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return Container(
-                      width: double.infinity,
-                      height: 220,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: _primaryColor),
-                      ),
-                    );
-                  }
-
-                  if (!snapshot.hasData) {
-                    return Container(
-                      width: double.infinity,
-                      height: 220,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: const Text(
-                        'Image unavailable',
-                        style: TextStyle(color: _textMuted),
-                      ),
-                    );
-                  }
-
-                  return Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: AspectRatio(
-                      aspectRatio: 4 / 3,
-                      child: Image.network(
-                        snapshot.data!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Center(
-                              child: Text(
-                                'Image unavailable',
-                                style: TextStyle(color: _textMuted),
-                              ),
-                            ),
-                      ),
-                    ),
-                  );
-                },
+            Positioned(
+              top: top + 8,
+              left: 16,
+              child: CircleBackButton(
+                backgroundColor: Colors.white.withValues(alpha: 0.92),
+                showBorder: false,
               ),
-            ],
+            ),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+              margin: EdgeInsets.only(top: _photoHeight + top - 26),
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _NutrientTag(label: primary.label),
+                  const SizedBox(height: 10),
                   Text(
-                    scan.isHealthy ? 'Healthy Scan' : 'Deficient Scan',
+                    primary.isHealthy ? 'Healthy leaf' : primary.label,
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: _textMain,
+                      fontFamily: AppFonts.display,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.6,
+                      height: 1.05,
+                      color: AppColors.textDark,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${scan.createdAt.month}/${scan.createdAt.day}/${scan.createdAt.year}',
-                    style: const TextStyle(fontSize: 12, color: _textMuted),
+                    '${(primary.confidence * 100).round()}% confidence '
+                    '\u00B7 $areas ${areas == 1 ? 'area' : 'areas'} found '
+                    '\u00B7 $_dateTime',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  ...scan.detections.map((detection) {
-                    final color = detection.isHealthy
-                        ? _primaryColor
-                        : const Color(0xFFDC2626);
-                    return Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: color.withValues(alpha: 0.15),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  if (DetectionService.isSample) const _SampleNotice(),
+                  for (final detection in scan.detections) ...[
+                    if (areas > 1) ...[
+                      const SizedBox(height: 22),
+                      Row(
                         children: [
+                          NutrientDot(label: detection.label),
+                          const SizedBox(width: 8),
                           Text(
-                            detection.label,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: color,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            detection.symptom,
+                            '${detection.label} \u00B7 '
+                            '${(detection.confidence * 100).round()}%',
                             style: const TextStyle(
-                              fontSize: 13,
-                              color: _textMain,
-                              height: 1.35,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Confidence: ${(detection.confidence * 100).round()}%',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: _textMuted,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Fertilizer: ${detection.fertilizer}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: _textMuted,
-                            ),
-                          ),
-                          Text(
-                            'Rate: ${detection.rate}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: _textMuted,
-                            ),
-                          ),
-                          Text(
-                            'Timing: ${detection.timing}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: _textMuted,
-                            ),
-                          ),
-                          Text(
-                            'Note: ${detection.note}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: _textMuted,
+                              fontFamily: AppFonts.display,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  }),
+                    ],
+                    _DetectionDetails(detection: detection),
+                  ],
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Explains that results are simulated until the trained model is added.
+class _SampleNotice extends StatelessWidget {
+  const _SampleNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.corn.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, size: 18, color: AppColors.textDark),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Sample result. The detection model is not trained yet, so '
+              'this is not a real diagnosis.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: AppColors.textDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Colored dot plus nutrient name, e.g. "N  Nitrogen".
+class _NutrientTag extends StatelessWidget {
+  const _NutrientTag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        NutrientDot(label: label),
+        const SizedBox(width: 6),
+        Text(
+          label.replaceAll(' Deficiency', ''),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.nutrient(label),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// "What we see" and "Recommendations" cards for one detection.
+class _DetectionDetails extends StatelessWidget {
+  const _DetectionDetails({required this.detection});
+
+  final Detection detection;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _InfoCard(
+          heading: 'What we see',
+          child: Text(detection.symptom, style: _bodyStyle),
+        ),
+        _InfoCard(
+          heading: 'Recommendations',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                detection.fertilizer,
+                style: _bodyStyle.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _Fact(value: detection.rate, label: 'Rate')),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _Fact(value: detection.timing, label: 'Timing'),
+                  ),
+                ],
+              ),
+              if (detection.note.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  detection.note,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  static const TextStyle _bodyStyle = TextStyle(
+    fontSize: 14,
+    height: 1.45,
+    color: AppColors.textDark,
+  );
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.heading, required this.child});
+
+  final String heading;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            heading.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11,
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+// Small value-over-label tile inside the "Recommendations" card.
+class _Fact extends StatelessWidget {
+  const _Fact({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: AppFonts.display,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+          ),
+        ],
       ),
     );
   }
