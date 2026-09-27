@@ -1,5 +1,42 @@
 # Activity Log
 
+## 2026-09-27: Result photo cropped and tags cut off
+
+- The result header used BoxFit.cover, so part of the photo (and any box in
+  it) was cropped, and box fractions no longer matched what was shown.
+- `ScanPhoto` resolves the photo's real shape (`fitWhole`) and reports it via
+  `onAspect`; the result screen sizes its photo band to that shape, so the
+  photo fills the width with no bars and nothing is cropped. Boxes are mapped
+  onto the drawn photo, so they stay correct if a very tall photo is trimmed
+  by the 72%-of-screen cap.
+- Confidence tags now sit inside the box (top-left, drop shadow, 12px)
+  instead of above it, where the photo edge clipped them.
+- A tag whose box starts off-screen is pushed in, so it stays visible.
+- Result photo height follows the photo: width / aspect, min 280, max 72%
+  of the screen minus the status bar.
+- Status bar no longer sits on the photo: its own dark strip above the photo,
+  with light status icons (AnnotatedRegion).
+
+## 2026-09-27: Confidence calibration and duplicate leaf boxes
+
+- Client feedback: never show 100%. `confidencePercent` in
+  `lib/core/confidence.dart` shows the model's own value (one decimal at 99%
+  and above, e.g. 99.8%), capped at 99.9 so nothing reads 100%. Used by Home,
+  the result screen, the photo box tags, history rows and alerts.
+
+- Every scan showed 99-100% confidence while test accuracy is 89.63%
+  (Potassium recall 62.5%), so the number promised certainty the model
+  does not have.
+- `detection_service.dart`: added `_temperature` (softmax temperature
+  scaling, applied in `_calibrate`) - 1.0 until the value is fitted; steps
+  in `docs/calibration.md`. Does not change which class wins.
+- NMS also drops a box that is 70% or more contained in a kept box, so one
+  leaf caught by two nested boxes is no longer reported as two areas.
+- New `lib/core/confidence.dart`: High / Medium / Low bands. Result screen
+  shows "High confidence (87%)" and a retake notice when any detection is
+  low; Home card shows the band instead of the word "Confidence".
+- Not compiled: no Flutter SDK in this session.
+
 ## 2026-09-27: Circular back button
 
 - New `lib/widgets/circle_back_button.dart`: fixed 44px circle, hairline

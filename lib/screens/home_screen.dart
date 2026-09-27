@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/colors.dart';
+import '../core/confidence.dart';
 import '../core/no_transition_route.dart';
 import '../core/throttled_loader.dart';
 import '../models/scan_result.dart';
@@ -231,17 +232,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         NutrientDot(label: detection.label),
                         const SizedBox(width: 6),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Confidence',
-                            style: TextStyle(
+                            confidenceWord(confidence),
+                            style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFFCFE2D4),
                             ),
                           ),
                         ),
                         Text(
-                          '${(confidence * 100).round()}%',
+                          confidencePercent(confidence),
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

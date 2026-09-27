@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/colors.dart';
+import '../core/confidence.dart';
 import '../models/scan_result.dart';
 import 'nutrient_dot.dart';
 
@@ -48,7 +49,7 @@ class DetectionAlertCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${(detection.confidence * 100).round()}%',
+                      confidencePercent(detection.confidence),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 import '../core/colors.dart';
+import '../core/confidence.dart';
 import '../models/scan_result.dart';
 import '../services/detection_service.dart';
 import '../services/scan_service.dart';
@@ -115,7 +117,7 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
                       for (final d in scan.detections)
                         Text(
                           '${d.isHealthy ? 'Healthy' : d.label} '
-                          '\u00B7 ${(d.confidence * 100).round()}%',
+                          '\u00B7 ${confidencePercent(d.confidence)}',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -143,16 +145,29 @@ class _ScanHistoryScreenState extends State<ScanHistoryScreen> {
 }
 
 // Result view for one scan: photo with NPK boxes, then a sheet per detection.
-class ScanHistoryDetailScreen extends StatelessWidget {
+class ScanHistoryDetailScreen extends StatefulWidget {
   const ScanHistoryDetailScreen({super.key, required this.scan});
 
   final ScanResult scan;
 
-  static const double _photoHeight = 300;
+  @override
+  State<ScanHistoryDetailScreen> createState() =>
+      _ScanHistoryDetailScreenState();
+}
+
+class _ScanHistoryDetailScreenState extends State<ScanHistoryDetailScreen> {
+  // Until the photo's shape is known, and bounds for very tall photos.
+  static const double _minPhotoHeight = 280;
+  static const double _maxPhotoHeightFraction = 0.72;
+
+  // Photo width divided by height, reported by ScanPhoto once it loads.
+  double? _aspect;
   static const List<String> _months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
+
+  ScanResult get scan => widget.scan;
 
   String get _dateTime {
     final d = scan.createdAt.toLocal();
@@ -164,19 +179,43 @@ class ScanHistoryDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.of(context).padding.top;
+    final media = MediaQuery.of(context);
+    final top = media.padding.top;
+    // The photo fills the width and the status bar area; its height follows
+    // its own shape, so there are no bars beside it.
+    final aspect = _aspect;
+    final photoHeight = aspect == null
+        ? _minPhotoHeight
+        : (media.size.width / aspect).clamp(
+            _minPhotoHeight,
+            media.size.height * _maxPhotoHeightFraction - top,
+          );
     final primary = scan.primaryDetection;
     final areas = scan.detections.length;
 
-    return Scaffold(
-      body: SingleChildScrollView(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Stack(
           children: [
-            SizedBox(
-              height: _photoHeight + top,
-              width: double.infinity,
-              child: ScanPhoto(scan: scan, showLabels: true),
+            // The status bar gets its own dark strip, so the phone's clock
+            // and icons never sit on top of the photo.
+            Column(
+              children: [
+                Container(height: top, color: AppColors.primaryDark),
+                SizedBox(
+                  height: photoHeight,
+                  width: double.infinity,
+                  child: ScanPhoto(
+                    scan: scan,
+                    showLabels: true,
+                    fitWhole: true,
+                    onAspect: (value) => setState(() => _aspect = value),
+                  ),
+                ),
+              ],
             ),
             Positioned(
               top: top + 8,
@@ -188,7 +227,7 @@ class ScanHistoryDetailScreen extends StatelessWidget {
             ),
             Container(
               width: double.infinity,
-              margin: EdgeInsets.only(top: _photoHeight + top - 26),
+              margin: EdgeInsets.only(top: top + photoHeight - 26),
               padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
               decoration: const BoxDecoration(
                 color: AppColors.background,
@@ -212,7 +251,8 @@ class ScanHistoryDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${(primary.confidence * 100).round()}% confidence '
+                    '${confidenceWord(primary.confidence)} '
+                    '(${confidencePercent(primary.confidence)}) '
                     '\u00B7 $areas ${areas == 1 ? 'area' : 'areas'} found '
                     '\u00B7 $_dateTime',
                     style: const TextStyle(
@@ -221,6 +261,10 @@ class ScanHistoryDetailScreen extends StatelessWidget {
                     ),
                   ),
                   if (DetectionService.isSample) const _SampleNotice(),
+                  if (scan.detections.any(
+                    (d) => confidenceLevel(d.confidence) == ConfidenceLevel.low,
+                  ))
+                    const _LowConfidenceNotice(),
                   for (final detection in scan.detections) ...[
                     if (areas > 1) ...[
                       const SizedBox(height: 22),
@@ -230,7 +274,7 @@ class ScanHistoryDetailScreen extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             '${detection.label} \u00B7 '
-                            '${(detection.confidence * 100).round()}%',
+                            '${confidencePercent(detection.confidence)}',
                             style: const TextStyle(
                               fontFamily: AppFonts.display,
                               fontSize: 16,
@@ -246,8 +290,44 @@ class ScanHistoryDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+// Warns that a low-scoring result should not be acted on as-is.
+class _LowConfidenceNotice extends StatelessWidget {
+  const _LowConfidenceNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.corn.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.help_outline_rounded, size: 18, color: AppColors.textDark),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'The model is unsure about this leaf. Retake the photo in good '
+              'light, filling the frame with one leaf, before applying any '
+              'fertilizer.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: AppColors.textDark,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

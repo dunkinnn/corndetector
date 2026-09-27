@@ -129,6 +129,13 @@ const _classLabels = [
 
 const double _leafConfThreshold = 0.45;
 const double _nmsIou = 0.45;
+
+// Boxes this much inside a kept box are the same leaf seen twice.
+const double _nmsContainment = 0.7;
+
+// Softmax temperature for the classifier, fitted on the validation set with
+// docs/calibration.md. Above 1.0 it softens the near-100% scores; 1.0 is raw.
+const double _temperature = 1.0;
 const int _maxSide = 1280;
 const int _classifierSize = 224;
 
@@ -225,9 +232,21 @@ List<Rectangle<double>> _nms(List<(double, Rectangle<double>)> candidates) {
   candidates.sort((a, b) => b.$1.compareTo(a.$1));
   final kept = <Rectangle<double>>[];
   for (final (_, box) in candidates) {
-    if (kept.every((k) => _iou(k, box) < _nmsIou)) kept.add(box);
+    final overlaps = kept.any(
+      (k) => _iou(k, box) >= _nmsIou || _containment(k, box) >= _nmsContainment,
+    );
+    if (!overlaps) kept.add(box);
   }
   return kept;
+}
+
+// Overlap as a fraction of the smaller box, so a box nested inside a much
+// larger one still counts as a duplicate even when its IoU is low.
+double _containment(Rectangle<double> a, Rectangle<double> b) {
+  final inter = a.intersection(b);
+  if (inter == null) return 0;
+  final smaller = min(a.width * a.height, b.width * b.height);
+  return smaller == 0 ? 0 : inter.width * inter.height / smaller;
 }
 
 double _iou(Rectangle<double> a, Rectangle<double> b) {
@@ -235,6 +254,17 @@ double _iou(Rectangle<double> a, Rectangle<double> b) {
   if (inter == null) return 0;
   final i = inter.width * inter.height;
   return i / (a.width * a.height + b.width * b.height - i);
+}
+
+// Temperature scaling: softmax(logits / T) rewritten on probabilities, so a
+// model that reports 100% on every leaf gives scores that match its accuracy.
+List<double> _calibrate(Float32List probs) {
+  if (_temperature == 1.0) return probs.toList();
+  final powered = [
+    for (final p in probs) pow(max(p, 1e-12), 1 / _temperature).toDouble(),
+  ];
+  final total = powered.reduce((a, b) => a + b);
+  return [for (final p in powered) p / total];
 }
 
 // Crops one leaf, pads it like training preprocessing, and runs EfficientNet-B0.
@@ -259,13 +289,14 @@ _Leaf _classify(Interpreter classifier, img.Image photo, Rectangle<double> box) 
   final probs = Float32List(_classLabels.length);
   classifier.run(input.buffer, probs.buffer);
 
+  final scaled = _calibrate(probs);
   var best = 0;
-  for (var c = 1; c < probs.length; c++) {
-    if (probs[c] > probs[best]) best = c;
+  for (var c = 1; c < scaled.length; c++) {
+    if (scaled[c] > scaled[best]) best = c;
   }
   return _Leaf(
     _classLabels[best],
-    probs[best].toDouble(),
+    scaled[best],
     DetectionBox(
       left: box.left / photo.width,
       top: box.top / photo.height,
