@@ -26,17 +26,17 @@ class Validators {
   }
 
   // Accepts digits with optional leading +, spaces, or dashes, 7-13 digits long.
-  static final RegExp _contactNumberPattern = RegExp(r'^\+?[0-9\-\s]{7,15}$');
+  static final RegExp _phonePattern = RegExp(r'^\+?[0-9\-\s]{7,15}$');
 
-  static String? contactNumber(String? value) {
+  static String? phone(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Contact number is required';
+      return 'Phone number is required';
     }
     final digitCount = value.replaceAll(RegExp(r'[^0-9]'), '').length;
-    if (!_contactNumberPattern.hasMatch(value.trim()) ||
+    if (!_phonePattern.hasMatch(value.trim()) ||
         digitCount < 7 ||
         digitCount > 13) {
-      return 'Enter a valid contact number';
+      return 'Enter a valid phone number';
     }
     return null;
   }
