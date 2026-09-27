@@ -13,7 +13,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // TODO: persist with shared_preferences, as the login screen already does.
   bool _scanReminders = true;
   bool _deficiencyAlerts = true;
   bool _saveScanPhotos = false;
